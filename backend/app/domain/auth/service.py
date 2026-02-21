@@ -1,0 +1,564 @@
+import random
+import logging
+import time
+from sqlalchemy.orm import Session
+from typing import Dict, Any, Optional
+# Core & Security
+from app.core.security import (
+    get_password_hash,
+    verify_password,
+    create_access_token,
+    create_refresh_token,
+    decode_refresh_token,
+)
+from app.core.config import settings
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.infrastructure.outbox.repository import OutboxRepository
+from app.domain.auth.verification_service import verification_service
+from app.domain.users.model import User
+# Exceptions - ניתוב מדויק לפי החלוקה החדשה
+from app.core.exceptions.auth import (
+    InvalidCredentialsError,
+    UserNotVerifiedError,
+    InvalidVerificationCodeError,
+    InvalidResetCodeError,
+    InvalidRefreshTokenError,
+    InvalidPasswordError,
+)
+from app.core.exceptions.user import (
+    UserNotFoundError,
+    PhoneAlreadyRegisteredError,
+    EmailAlreadyRegisteredError,
+)
+# הסר את כל הכפילויות ושמור רק על זה:
+from app.infrastructure.outbox.model import OutboxEvent
+from app.domain.events.enum import DispatchTarget
+
+# ייבוא של המודל (כדי שה-IDE יזהה את המתודות של new_user)
+# שים לב: וולידציה בדרך כלל לא נזרקת מהסרוויס אלא מהסכימה, אבל הן כאן ליתר ביטחון
+from app.core.exceptions.validation import PasswordTooWeakError, InvalidEmailError, InvalidPhoneError
+from app.core.utils.validators import normalize_email_for_auth
+
+# Domain & Infrastructure
+from app.domain.users.crud import crud_user
+from app.domain.users.schema import UserCreate
+from app.domain.auth.schema import UserRegister, ChangePasswordRequest
+from app.domain.users.model import User
+from app.domain.auth.google_auth import verify_google_id_token
+from app.infrastructure.redis.client import redis_client
+from app.infrastructure.rabbitmq.client import rabbit_client
+
+logger = logging.getLogger(__name__)
+
+class AuthService:
+    def __init__(self):
+        self.redis = redis_client
+        self.rabbit = rabbit_client
+        self.crud_user = crud_user
+        self.outbox_repo = OutboxRepository()
+    # app/domain/auth/service.py
+
+    # app/services/auth_service.py
+    async def register_new_user(self, db: AsyncSession, user_in: UserRegister) -> User:
+        await self._validate_unique_user(db, user_in)
+        hashed_password = get_password_hash(user_in.password)
+
+        # 1. יצירת המשתמש (בלי commit בתוך ה-CRUD!)
+        new_user = await self.crud_user.create(db, obj_in=user_in, hashed_password=hashed_password)
+        
+        # 2. יצירת קוד אימות
+        code = await verification_service.create_verification_event(
+            user_id=str(new_user.user_id), 
+            event_name="email_verification"
+        )
+        
+        # 3. אירועים לאאוטבוקס. המפתח (routing_key) וה-exchange לא מוגדרים כאן –
+        #    הם נגזרים מ-event_name כשהאוטבוקס מעבד את האירוע: OutboxService קורא
+        #    get_routing_metadata(event_name) (domain.events.routing) ומקבל { exchange, routing_key }.
+        await self.outbox_repo.save_event(db, OutboxEvent(
+            event_name="auth.email_verification",
+            payload={"user_id": str(new_user.user_id), "data": {"code": code, "email": new_user.email}},
+            targets=[DispatchTarget.RABBITMQ.value],
+        ))
+        await self.outbox_repo.save_event(db, OutboxEvent(
+            event_name="user.registered",
+            payload={"user_id": str(new_user.user_id)},
+            targets=[DispatchTarget.RABBITMQ.value],
+        ))
+        
+        # בפיתוח (DEBUG): מאפשרים כניסה מיד אחרי הרשמה בלי אימות אימייל
+        if getattr(settings, "DEBUG", False):
+            new_user.is_verified = True
+            db.add(new_user)
+        
+        # 4. ה-Commit הסופי שסוגר את כל הפעולות ביחד
+        try:
+            await db.commit()
+            await db.refresh(new_user)
+            return new_user
+        except Exception as e:
+            await db.rollback()
+            # כאן נכנס השימוש ב-LinkupError שביקשת לרשת ממנו
+            # raise LinkupError(
+            #     message=f"Registration failed: {str(e)}",
+            #     status_code=500
+            # )
+
+    async def verify_user_email(self, db: AsyncSession, email: str, code: str):
+        # נרמול האימייל לפני החיפוש (כמו ב-register)
+        normalized_email = normalize_email_for_auth(email)
+        logger.info(f"🔍 Verifying email - Original: '{email}', Normalized: '{normalized_email}'")
+        user = await self.crud_user.get_by_email(db, email=normalized_email)
+        if not user:
+            logger.error(f"❌ User not found for email: '{normalized_email}' (original: '{email}')")
+            raise UserNotFoundError()
+        logger.info(f"✅ User found: user_id={user.user_id}, email={user.email}")
+
+        # קריאה אחת פשוטה שבודקת הכל מול רדיס
+        await verification_service.verify_otp(str(user.user_id), "email_verification", code)
+
+        await self.crud_user.update(db, db_obj=user, obj_in={"is_verified": True})
+        return {"message": "Account verified successfully", "status": "success"}
+    
+
+
+    async def request_password_reset(self, db: AsyncSession, email: str):
+        """
+        שולח קוד איפוס למייל. כמו רישום – הקוד ב-Redis, השליחה במייל דרך Outbox.
+        אותו תור (notifications_queue), אותו exchange (user), מפתח שונה: auth.password_reset_code.
+        """
+        user = await self.crud_user.get_by_email(db, email=email)
+        if not user:
+            return {"message": "If the email exists, a code was sent."}
+
+        code = await verification_service.create_verification_event(
+            str(user.user_id), "password_reset"
+        )
+        await self.outbox_repo.save_event(db, OutboxEvent(
+            event_name="auth.password_reset_code",
+            payload={"user_id": str(user.user_id), "data": {"code": code, "user_name": user.full_name, "email": user.email}},
+            targets=[DispatchTarget.RABBITMQ.value],
+        ))
+        await db.commit()
+        return {"message": "If the email exists, a code was sent."}
+
+    async def _validate_unique_user(self, db: AsyncSession, user_in: UserRegister):
+        """בדיקות מקדימות לפני תחילת טרנזקציה"""
+        if await self.crud_user.get_by_phone(db, phone=user_in.phone_number):
+            raise PhoneAlreadyRegisteredError(phone=user_in.phone_number)
+        
+        if user_in.email and await self.crud_user.get_by_email(db, email=user_in.email):
+            raise EmailAlreadyRegisteredError(email=user_in.email)
+
+    async def initiate_email_verification(self, db: Session, email: str): # שינוי ל-email
+        user = self.crud_user.get_by_email(db, email=email)
+        if not user:
+            raise UserNotFoundError(identifier=email)
+
+        if user.is_verified:
+            return {"detail": "Account already verified"}
+
+        verification_code = f"{random.randint(100000, 999999)}"
+        # שמירה ב-Redis לפי מייל
+        await self.redis.save(f"verify_code:{email}", verification_code, expire=1800)
+
+        await self.rabbit.publish(
+            message={
+                "event_type": "email_verification",
+                "user_id": str(user.user_id),
+                "data": {
+                    "email": user.email,        # חובה ל-Worker!
+                    "token": verification_code,
+                    "user_name": user.full_name
+                }
+            }
+        )
+        return {"detail": "Verification code sent to email"}
+    
+    async def authenticate_and_create_token(
+        self,
+        db: AsyncSession,
+        email: str,
+        password: str,
+    ) -> Dict[str, Any]:
+        """
+        אימות: שליפת משתמש לפי מייל, בדיקת סיסמה (verify_password), בדיקת is_verified.
+        מחזיר טוקן + פרטי משתמש להצגת 'ברוך הבא, {full_name}'.
+        """
+        # 1. שליפת משתמש מה-DB (שימוש ב-await כי ה-CRUD שלך אסינכרוני)
+        user = await self.crud_user.get_by_email(db, email=email)
+
+        # 2. בדיקת קיום משתמש וסיסמה (Security: תשובה אחידה למניעת Enumeration)
+        if not user or not verify_password(password, user.hashed_password):
+            raise InvalidCredentialsError()
+
+        # 3. בדיקת סטטוס אימות מייל - שימוש בעמודה החדשה שלך
+        if not user.is_verified:
+            # כאן אנחנו זורקים את השגיאה שביקשת, כולל המייל ל-Payload
+            logger.warning(f"Login blocked: User {email} is not verified yet.")
+            raise UserNotVerifiedError(email=user.email)
+
+        # 4. יצירת Access Token (קצר) + Refresh Token (ארוך)
+        access_token = create_access_token(data={"sub": str(user.user_id)})
+        refresh_token = create_refresh_token(data={"sub": str(user.user_id)})
+
+        # 5. שמירת Refresh Token ב-DB (לאפשר ביטול ב-logout)
+        await self.crud_user.update_refresh_token(
+            db, user=user, refresh_token=refresh_token
+        )
+
+        logger.info("User %s logged in successfully.", email)
+
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+            "user": {
+                "user_id": user.user_id,
+                "full_name": user.full_name,
+                "email": user.email,
+            },
+        }
+
+    async def authenticate_with_google(
+        self,
+        db: AsyncSession,
+        id_token: str,
+    ) -> Dict[str, Any]:
+        """
+        אימות/רישום דרך Google OAuth.
+        
+        זרימה:
+        1. מאמת את ה-ID token עם Google
+        2. בודק אם משתמש עם email זה קיים
+        3. אם לא קיים → יוצר משתמש חדש (auto-signup):
+           - email, full_name, avatar_url מ-Google
+           - hashed_password = ערך דמה (לא בשימוש)
+           - phone_number = placeholder (ניתן לעדכן מאוחר יותר)
+           - is_verified = True (Google מאמת את ה-email)
+        4. מחזיר access_token + refresh_token + user (כמו authenticate_and_create_token)
+        """
+        # 1. אימות ה-ID token עם Google
+        try:
+            google_user = verify_google_id_token(id_token)
+        except ValueError as e:
+            logger.error(f"Google ID token verification failed: {e}")
+            raise InvalidCredentialsError()
+        
+        email = google_user.get('email')
+        if not email:
+            raise ValueError("Google ID token missing email")
+        
+        # נרמול email (lowercase)
+        email = normalize_email_for_auth(email)
+        
+        # 2. בדיקה אם משתמש קיים
+        user = await self.crud_user.get_by_email(db, email=email)
+        
+        if not user:
+            # 3. Auto-signup: יצירת משתמש חדש
+            # מספר טלפון זמני - המשתמש יוכל לעדכן מאוחר יותר
+            # נשתמש בפורמט תקין של מספר טלפון (E.164) עם prefix זמני
+            # נשתמש ב-sub מ-Google כדי ליצור מספר ייחודי
+            google_sub = google_user.get('sub', '000000000')[:9]  # 9 ספרות ראשונות
+            placeholder_phone = f"+972500000{google_sub}"  # פורמט E.164 תקין
+            
+            # יצירת סיסמה דמה (לא בשימוש, אבל נדרש ב-DB)
+            # נשתמש ב-random string ארוך שלא ניתן לנחש
+            import secrets
+            dummy_password = secrets.token_urlsafe(32)
+            hashed_password = get_password_hash(dummy_password)
+            
+            # יצירת UserCreate object (password דמה - לא בשימוש)
+            user_create = UserCreate(
+                full_name=google_user.get('name', 'Google User'),
+                email=email,
+                phone_number=placeholder_phone,
+                password=dummy_password,  # דמה - לא בשימוש
+                fcm_token=None,
+            )
+            
+            # יצירת המשתמש
+            user = await self.crud_user.create(
+                db,
+                obj_in=user_create,
+                hashed_password=hashed_password
+            )
+            
+            # עדכון שדות נוספים מ-Google
+            if google_user.get('picture'):
+                user.avatar_url = google_user['picture']
+            user.is_verified = True  # Google כבר מאמת את ה-email
+            
+            await db.commit()
+            await db.refresh(user)
+            
+            logger.info(f"Auto-signup via Google: {email}")
+            
+            # אירוע user.registered (אם צריך)
+            await self.outbox_repo.save_event(db, OutboxEvent(
+                event_name="user.registered",
+                payload={"user_id": str(user.user_id), "auth_provider": "google"},
+                targets=[DispatchTarget.RABBITMQ.value],
+            ))
+            await db.commit()
+        
+        # 4. יצירת tokens (גם למשתמש חדש וגם למשתמש קיים)
+        access_token = create_access_token(data={"sub": str(user.user_id)})
+        refresh_token = create_refresh_token(data={"sub": str(user.user_id)})
+        
+        # 5. שמירת Refresh Token ב-DB
+        await self.crud_user.update_refresh_token(
+            db, user=user, refresh_token=refresh_token
+        )
+        
+        # 6. עדכון last_login
+        from datetime import datetime, timezone
+        user.last_login = datetime.now(timezone.utc)
+        await db.commit()
+        
+        logger.info(f"User {email} authenticated via Google successfully.")
+        
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+            "user": {
+                "user_id": user.user_id,
+                "full_name": user.full_name,
+                "email": user.email,
+            },
+        }
+
+    async def refresh_access_token(
+        self, db: AsyncSession, refresh_token: str
+    ) -> Dict[str, Any]:
+        """
+        מפענח Refresh Token, בודק שהוא תואם ל-DB, מחזיר Access Token חדש + Refresh Token חדש (רוטציה).
+        """
+        payload = decode_refresh_token(refresh_token)
+        if not payload:
+            raise InvalidRefreshTokenError()
+
+        user_id = payload.get("sub")
+        if not user_id:
+            raise InvalidRefreshTokenError()
+
+        user = await self.crud_user.get_by_id(db, id=int(user_id))
+        if not user or not user.is_active:
+            raise InvalidRefreshTokenError()
+        if user.refresh_token != refresh_token:
+            raise InvalidRefreshTokenError()
+
+        new_access_token = create_access_token(data={"sub": str(user.user_id)})
+        new_refresh_token = create_refresh_token(data={"sub": str(user.user_id)})
+        await self.crud_user.update_refresh_token(
+            db, user=user, refresh_token=new_refresh_token
+        )
+
+        return {
+            "access_token": new_access_token,
+            "refresh_token": new_refresh_token,
+            "token_type": "bearer",
+            "user": {
+                "user_id": user.user_id,
+                "full_name": user.full_name,
+                "email": user.email,
+            },
+        }
+
+    async def logout(self, db: AsyncSession, user: User) -> None:
+        """מבטל את ה-Refresh Token של המשתמש (logout – התנתקות מכל המכשירים)."""
+        await self.crud_user.update_refresh_token(db, user=user, refresh_token=None)
+
+    async def change_password(
+        self, db: AsyncSession, user_id: int, data: ChangePasswordRequest
+    ) -> dict:
+        """
+        שינוי סיסמה למשתמש מחובר: אימות סיסמה ישנה, עדכון לסיסמה חדשה.
+        ולידציית התאמה וחוזק כבר בסכמה (כמו ברישום).
+        """
+        user = await self.crud_user.get_by_id(db, id=user_id)
+        if not user:
+            raise UserNotFoundError(user_id=user_id)
+        if not verify_password(data.old_password, user.hashed_password):
+            raise InvalidPasswordError()
+        hashed = get_password_hash(data.new_password)
+        await self.crud_user.update_password(db, user=user, hashed_password=hashed)
+        return {"message": "הסיסמה עודכנה בהצלחה", "status": "success"}
+
+    async def initiate_password_reset(self, db: Session, email: str):
+    # קריאה למתודה מה-CRUD
+        user = self.crud_user.get_by_email(db, email=email) 
+
+        if not user:
+        # אבטחה: הודעה גנרית כדי לא לחשוף אם המייל קיים
+            return {"detail": "If the user exists, a reset code has been sent"}
+
+        reset_code = f"{random.randint(100000, 999999)}"
+        await self.redis.save(f"reset_code:{email}", reset_code, expire=600)
+
+        await self.rabbit.publish(
+            message={
+                "event_type": "password_reset_code",
+                "user_id": str(user.user_id),
+                "data": {
+                    "email": user.email,
+                    "code": reset_code,
+                    "user_name": user.full_name
+                }
+            }
+        )
+        return {"detail": "Reset code sent successfully"}
+
+    async def reset_password_with_code(
+        self, db: AsyncSession, email: str, code: str, new_password: str
+    ):
+        """מאמת קוד איפוס (מ-Redis), מעדכן סיסמה ומחזיר הצלחה. הקוד נמחק אחרי שימוש."""
+        user = await self.crud_user.get_by_email(db, email=email)
+        if not user:
+            raise InvalidResetCodeError(email=email)
+
+        await verification_service.verify_otp(
+            str(user.user_id), "password_reset", code
+        )
+        hashed = get_password_hash(new_password)
+        await self.crud_user.update_password(db, user=user, hashed_password=hashed)
+        return {"message": "Password reset successfully.", "status": "success"}
+
+    async def _get_user_or_raise(self, db: Session, email: str) -> User:
+        user = self.crud_user.get_by_email(db, email=email)
+        if not user:
+            # תיקון: UserNotFoundError מצפה ל-user_id (int)
+            raise UserNotFoundError(identifier=email) 
+        return user
+
+    async def authenticate_with_google(
+        self, db: AsyncSession, id_token: str
+    ) -> Dict[str, Any]:
+        """
+        אימות/רישום דרך Google OAuth.
+        
+        זרימה:
+        1. מאמת את ה-ID token עם Google
+        2. בודק אם משתמש עם email זה קיים
+        3. אם לא קיים → auto-signup (יוצר משתמש חדש)
+        4. מחזיר access_token + refresh_token + user (כמו authenticate_and_create_token)
+        """
+        # 1. אימות ה-ID token עם Google
+        try:
+            google_user_info = verify_google_id_token(id_token)
+        except ValueError as e:
+            logger.warning(f"Google ID token verification failed: {e}")
+            raise InvalidCredentialsError()
+        
+        # 2. חילוץ נתונים מ-Google
+        email = google_user_info.get("email")
+        if not email:
+            raise ValueError("Google ID token missing email")
+        
+        # נרמול email (כמו ב-login רגיל)
+        normalized_email = normalize_email_for_auth(email)
+        full_name = google_user_info.get("name", "Google User")
+        picture_url = google_user_info.get("picture")
+        google_sub = google_user_info.get("sub")  # Google user ID
+        
+        # 3. בדיקה אם משתמש קיים
+        user = await self.crud_user.get_by_email(db, email=normalized_email)
+        
+        if not user:
+            # 4. Auto-signup: יצירת משתמש חדש
+            # מספר טלפון: ערך placeholder זמני בפורמט בינלאומי תקין (המשתמש יוכל לעדכן מאוחר יותר)
+            # הסיסמה: ערך דמה (לא בשימוש, אבל נדרש ב-DB)
+            # פורמט: +972500000{google_sub[:6]} - זה יוצר מספר תקין כמו +972500000108481
+            if google_sub:
+                # לוקחים את 6 הספרות האחרונות מה-google_sub כדי ליצור מספר ייחודי
+                google_sub_suffix = google_sub[-6:] if len(google_sub) >= 6 else google_sub.zfill(6)
+                placeholder_phone = f"+972500000{google_sub_suffix}"
+            else:
+                # אם אין google_sub, משתמשים ב-timestamp
+                timestamp_suffix = str(int(time.time()))[-6:].zfill(6)
+                placeholder_phone = f"+972500000{timestamp_suffix}"
+            
+            placeholder_password = "google_oauth_no_password"  # לא בשימוש
+            
+            # בדיקה אם מספר הטלפון כבר קיים (נדיר, אבל אפשרי)
+            existing_phone_user = await self.crud_user.get_by_phone(db, phone=placeholder_phone)
+            if existing_phone_user:
+                # אם קיים, נוסיף timestamp
+                timestamp_suffix = str(int(time.time()))[-6:].zfill(6)
+                placeholder_phone = f"+972500000{timestamp_suffix}"
+            
+            # לוג לבדיקה
+            logger.info(f"Creating user with placeholder phone: {placeholder_phone}")
+            
+            # יצירת משתמש חדש
+            from app.domain.users.schema import UserCreate
+            user_create = UserCreate(
+                full_name=full_name,
+                email=normalized_email,
+                phone_number=placeholder_phone,
+                password=placeholder_password,  # לא בשימוש בפועל
+                fcm_token=None,
+            )
+            
+            # יצירת hash לסיסמה הדמה (נדרש ב-DB)
+            dummy_hashed_password = get_password_hash(placeholder_password)
+            
+            user = await self.crud_user.create(
+                db, obj_in=user_create, hashed_password=dummy_hashed_password
+            )
+            
+            # עדכון שדות נוספים
+            if picture_url:
+                user.avatar_url = picture_url
+            
+            # Google כבר מאמת את ה-email, אז is_verified = True
+            user.is_verified = True
+            
+            await db.commit()
+            await db.refresh(user)
+            
+            logger.info(f"Auto-signup via Google OAuth: {normalized_email}")
+            
+            # אופציונלי: יצירת אירוע user.registered (כמו ב-register_new_user)
+            await self.outbox_repo.save_event(db, OutboxEvent(
+                event_name="user.registered",
+                payload={"user_id": str(user.user_id), "auth_provider": "google"},
+                targets=[DispatchTarget.RABBITMQ.value],
+            ))
+            await db.commit()
+        else:
+            # משתמש קיים - עדכון פרטים (אם השתנו)
+            update_data = {}
+            if picture_url and user.avatar_url != picture_url:
+                update_data["avatar_url"] = picture_url
+            if full_name and user.full_name != full_name:
+                update_data["full_name"] = full_name
+            
+            if update_data:
+                await self.crud_user.update(db, db_obj=user, obj_in=update_data)
+            
+            logger.info(f"Google OAuth login: {normalized_email}")
+        
+        # 5. יצירת Access Token + Refresh Token (כמו ב-authenticate_and_create_token)
+        access_token = create_access_token(data={"sub": str(user.user_id)})
+        refresh_token = create_refresh_token(data={"sub": str(user.user_id)})
+        
+        # 6. שמירת Refresh Token ב-DB
+        await self.crud_user.update_refresh_token(
+            db, user=user, refresh_token=refresh_token
+        )
+        
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_type": "bearer",
+            "user": {
+                "user_id": user.user_id,
+                "full_name": user.full_name,
+                "email": user.email,
+            },
+        }
+
+auth_service = AuthService()

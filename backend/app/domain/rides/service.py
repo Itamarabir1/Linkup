@@ -1,0 +1,230 @@
+import json
+import logging
+from typing import Any, Dict, List, Optional
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.exceptions.ride import (
+    RideNotFoundError,
+    RideAlreadyCancelledError,
+    SessionExpiredError,
+)
+from app.core.exceptions.validation import SameOriginDestinationError
+from app.core.exceptions.infrastructure import RouteNotFoundError
+
+from app.infrastructure.redis.broadcast import broadcast
+from app.domain.rides.ride_repository import ride_cache_repo, RideCacheRepository
+from app.domain.rides.model import Ride
+from app.domain.rides.crud import crud_ride
+from app.domain.rides.mapper import RideMapper
+from app.domain.rides.schema import (
+    RideCreate,
+    RidePreviewCreate,
+    RidePreviewResponse,
+    RideResponse,
+    RideUpdate,
+)
+from app.domain.rides.enum import RideStatus, RideBroadcastAction
+from app.domain.rides.ride_broadcast import (
+    RideNotificationFactory,
+    RIDES_LIST_CHANNEL,
+    publish_ride_update,
+)
+from app.domain.geo import processor as geo_proc
+from app.domain.bookings.service import BookingService
+from app.domain.events.outbox import publish_to_outbox
+
+logger = logging.getLogger(__name__)
+
+
+class RideService:
+    def __init__(self, cache_repo: RideCacheRepository = ride_cache_repo):
+        self.cache = cache_repo
+
+    # --- Preview ---
+
+    async def get_ride_preview(self, preview_in: RidePreviewCreate) -> RidePreviewResponse:
+        """שלב 1: יצירת תצוגה מקדימה של מסלולים אפשריים ושמירתם ב-Cache."""
+        self._validate_preview_input(preview_in)
+        origin_address = await geo_proc.resolve_origin_address(
+            preview_in.origin_name,
+            preview_in.origin_lat,
+            preview_in.origin_lon,
+        )
+        geo_data = await geo_proc.get_full_routing_data(
+            origin_address,
+            preview_in.destination_name,
+        )
+        if not geo_data:
+            raise RouteNotFoundError(origin=origin_address, destination=preview_in.destination_name)
+        preview_res = RidePreviewResponse.from_processor(
+            geo_data=geo_data,
+            preview_in=preview_in,
+            origin_address=origin_address,
+        )
+        await self.cache.save_preview(preview_res, preview_in)
+        return preview_res
+
+    @staticmethod
+    def _validate_preview_input(preview_in: RidePreviewCreate) -> None:
+        if preview_in.origin_name and preview_in.origin_name == preview_in.destination_name:
+            raise SameOriginDestinationError(location_name=preview_in.origin_name)
+
+    # --- Create ride ---
+
+    async def create_ride(
+        self, db: AsyncSession, ride_in: RideCreate, current_user_id: int
+    ) -> RideResponse:
+        """שלב 2: אישור סופי של הנסיעה והעברתה מה-Cache ל-PostgreSQL."""
+        cached_data = await self._validate_and_get_cached_ride(ride_in)
+        cached_data["driver_id"] = current_user_id
+        new_ride = RideMapper.map_cache_to_model(
+            cached_data=cached_data,
+            selected_index=ride_in.selected_route_index,
+        )
+
+        try:
+            await self._persist_ride_and_publish_event(db, new_ride)
+            response = self._build_ride_response(new_ride, cached_data, ride_in)
+            await self._after_ride_created(response, new_ride, ride_in.session_id)
+            return response
+        except Exception as e:
+            await db.rollback()
+            logger.error("Failed to save ride to DB: %s", e)
+            raise
+
+    async def _validate_and_get_cached_ride(self, ride_in: RideCreate) -> Dict[str, Any]:
+        if not (ride_in.session_id and str(ride_in.session_id).strip()):
+            logger.warning("create_ride called with empty session_id")
+            raise SessionExpiredError(session_id=ride_in.session_id or "")
+        cached_data = await self.cache.get_preview(ride_in.session_id)
+        if not cached_data:
+            logger.warning("create_ride: no preview in cache for session_id=%s", ride_in.session_id)
+            raise SessionExpiredError(session_id=ride_in.session_id)
+        return cached_data
+
+    @staticmethod
+    async def _persist_ride_and_publish_event(db: AsyncSession, new_ride: Ride) -> None:
+        db.add(new_ride)
+        await db.flush()
+        await publish_to_outbox(db, "ride.created", {"ride_id": new_ride.ride_id})
+        await db.commit()
+        await db.refresh(new_ride)
+
+    @staticmethod
+    def _build_ride_response(
+        new_ride: Ride, cached_data: Dict[str, Any], ride_in: RideCreate
+    ) -> RideResponse:
+        response = RideResponse.model_validate(new_ride)
+        if not response.route_coords and cached_data.get("routes"):
+            selected_route = cached_data["routes"][ride_in.selected_route_index]
+            response = response.model_copy(
+                update={"route_coords": selected_route.get("coords", [])}
+            )
+        return response
+
+    async def _after_ride_created(
+        self, response: RideResponse, new_ride: Ride, session_id: str
+    ) -> None:
+        await self.cache.delete_preview(session_id)
+        try:
+            payload = RideNotificationFactory.create_broadcast_payload(
+                new_ride, RideBroadcastAction.CREATED.value
+            )
+            payload["ride"] = response.model_dump(mode="json")
+            await broadcast.publish(RIDES_LIST_CHANNEL, json.dumps(payload))
+        except Exception as e:
+            logger.warning("Broadcast ride created failed (ride still saved): %s", e)
+
+    # --- Read ---
+
+    @staticmethod
+    async def get_ride_by_id(db: AsyncSession, ride_id: int):
+        """שליפת נסיעה לפי מזהה (לשימוש ב-API עם AsyncSession)."""
+        return await crud_ride.get_async(db, ride_id)
+
+    async def get_my_rides(
+        self,
+        db: AsyncSession,
+        driver_id: int,
+        status: Optional[str] = None,
+    ) -> List[RideResponse]:
+        """רשימת נסיעות של הנהג המחובר (הנסיעות שלי)."""
+        status_enum = RideStatus(status) if status else None
+        rides = await crud_ride.get_by_driver_id(db, driver_id, status_enum)
+        return [RideResponse.model_validate(r) for r in rides]
+
+    # --- Update (partial) ---
+
+    async def update_ride(
+        self,
+        db: AsyncSession,
+        ride_id: int,
+        driver_id: int,
+        payload: RideUpdate,
+    ) -> RideResponse:
+        """עדכון חלקי – זמן יציאה ו/או מספר מושבים. רק הנהג בעלים."""
+        update_dict: Dict[str, Any] = {}
+        if payload.departure_time is not None:
+            update_dict["departure_time"] = payload.departure_time
+        if payload.available_seats is not None:
+            update_dict["available_seats"] = payload.available_seats
+        if not update_dict:
+            raise ValueError("נדרש לפחות שדה אחד לעדכון (departure_time או available_seats)")
+        ride = await db.run_sync(
+            lambda sess: crud_ride.update_partial(sess, ride_id, driver_id, **update_dict)
+        )
+        if not ride:
+            raise RideNotFoundError()
+        await publish_ride_update(
+            ride_id,
+            {"status": ride.status.value, "event": "RIDE_UPDATED"},
+        )
+        try:
+            broadcast_payload = RideNotificationFactory.create_broadcast_payload(
+                ride, RideBroadcastAction.UPDATED.value
+            )
+            broadcast_payload["ride_id"] = ride_id
+            await broadcast.publish(RIDES_LIST_CHANNEL, json.dumps(broadcast_payload))
+        except Exception as e:
+            logger.warning("Broadcast ride updated failed: %s", e)
+        return RideResponse.model_validate(ride)
+
+    # --- Cancel ---
+
+    async def cancel_ride_by_driver(
+        self, db: AsyncSession, ride_id: int, driver_id: int
+    ) -> None:
+        """ביטול נסיעה על ידי הנהג. לוגיקה + Outbox ב-BookingService."""
+        ride = await db.run_sync(
+            lambda sess: crud_ride.get_for_update(sess, ride_id=ride_id, driver_id=driver_id)
+        )
+        if not ride:
+            raise RideNotFoundError(ride_id)
+        if ride.status == RideStatus.CANCELLED:
+            raise RideAlreadyCancelledError()
+        origin_name = getattr(ride, "origin_name", None) or "—"
+        destination_name = getattr(ride, "destination_name", None) or "—"
+        await BookingService.cancel_ride_and_all_bookings(db, ride_id, driver_id)
+        # WebSocket: עדכון מיידי – ערוץ הנסיעה + רשימת נסיעות (ללא שימוש ב-session אחרי commit)
+        try:
+            await publish_ride_update(
+                ride_id,
+                {"status": RideStatus.CANCELLED.value, "event": "RIDE_CANCELLED"},
+            )
+        except Exception as e:
+            logger.warning("publish_ride_update (Redis) failed after cancel: %s", e)
+        try:
+            payload = {
+                "event": "RIDE_CANCELLED",
+                "ride_id": ride_id,
+                "status": RideStatus.CANCELLED.value,
+                "color": "red",
+                "message": f"הנסיעה בוטלה על ידי הנהג (מ-{origin_name} ל-{destination_name})",
+            }
+            await broadcast.publish(RIDES_LIST_CHANNEL, json.dumps(payload))
+        except Exception as e:
+            logger.warning("Broadcast ride cancelled failed: %s", e)
+
+
+ride_service = RideService()

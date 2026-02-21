@@ -1,0 +1,120 @@
+import logging
+import re
+import sys
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from app.core.config import settings
+from app.core.lifespan import lifespan
+from app.core.exceptions.handlers import LinkupError, linkup_exception_handler
+from app.core.middleware import HTTPSRedirectMiddleware, SecurityHeadersMiddleware
+from app.admin.setup import setup_admin
+from app.db.session import engine
+from app.api.v1.api_router import api_router
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# CORS: origins ממ-config או FRONTEND_URL (מחשבים לפני יצירת app)
+_cors_origins = getattr(settings, "CORS_ORIGINS", None) or []
+if not _cors_origins:
+    _cors_origins = [getattr(settings, "FRONTEND_URL", "https://linkup.co.il").rstrip("/")]
+_allow_origin_regex = None
+if getattr(settings, "DEBUG", False):
+    _allow_origin_regex = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+
+# Middleware שמוסיף CORS לכל תגובה (כולל 500) – רץ ראשון על התגובה
+class EnsureCORSHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if "/api/v1/" in path:
+            print("[Linkup] >>> בקשה: {} {}".format(request.method, path), flush=True)
+        response = await call_next(request)
+        if "/api/v1/" in path:
+            print("[Linkup] <<< תגובה: status={}".format(response.status_code), flush=True)
+        origin = request.headers.get("origin")
+        if origin and (
+            origin in _cors_origins
+            or (_allow_origin_regex and re.match(_allow_origin_regex, origin))
+        ):
+            response.headers.setdefault("Access-Control-Allow-Origin", origin)
+            response.headers.setdefault("Access-Control-Allow-Credentials", "true")
+        return response
+
+app = FastAPI(
+    title="Linkup API",
+    version="1.0.0",
+    lifespan=lifespan,
+    servers=[{"url": "http://127.0.0.1:8000", "description": "Local"}],
+)
+
+# CORS רגיל (לבקשות רגילות)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
+    allow_origin_regex=_allow_origin_regex,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    expose_headers=["*"],
+)
+# גיבוי: הוספת CORS גם לתגובות שעשויות לדלג על ה-middleware (למשל 500)
+app.add_middleware(EnsureCORSHeadersMiddleware)
+
+# Security headers (X-Content-Type-Options, X-Frame-Options, וכו')
+app.add_middleware(SecurityHeadersMiddleware)
+
+# HTTPS: הפנת HTTP → HTTPS כשמאחורי Proxy (להפעיל בפרודקשן עם FORCE_HTTPS_REDIRECT=True)
+if getattr(settings, "FORCE_HTTPS_REDIRECT", False):
+    app.add_middleware(HTTPSRedirectMiddleware)
+
+# רישום ה-Admin וה-Exception Handlers
+setup_admin(app, engine)
+app.add_exception_handler(LinkupError, linkup_exception_handler)
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """מחזיר 500 כ-JSON עם CORS headers. לא תופס HTTPException."""
+    if isinstance(exc, HTTPException):
+        raise exc
+    print("[Linkup] !!! שגיאה 500:", type(exc).__name__, str(exc), flush=True)
+    logger.exception("Unhandled exception: %s", exc)
+    
+    # הוספת CORS headers גם לשגיאות
+    origin = request.headers.get("origin")
+    headers = {}
+    if origin and (
+        origin in _cors_origins
+        or (_allow_origin_regex and re.match(_allow_origin_regex, origin))
+    ):
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+        headers["Access-Control-Allow-Methods"] = "*"
+        headers["Access-Control-Allow-Headers"] = "*"
+    
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "type": type(exc).__name__},
+        headers=headers,
+    )
+
+# שים לב! שורה אחת במקום ארבע
+app.include_router(api_router, prefix="/api/v1")
+
+@app.get("/", tags=["Health"])
+def read_root():
+    return {"status": "running", "version": "1.0.0", "project": settings.PROJECT_NAME}
+
+
+@app.get("/api/v1/health", tags=["Health"])
+def api_health():
+    """פתח בדפדפן: http://localhost:8000/api/v1/health – אם אתה רואה את זה, הבקאנד הנכון רץ."""
+    return {"ok": True, "message": "Linkup API", "version": "1.0.0"}
+
+
+# הדפסה בעלייה – לוודא שהקוד הנכון רץ
+print("[Linkup] Backend נטען (main.py) – CORS + לוגים פעילים", flush=True)

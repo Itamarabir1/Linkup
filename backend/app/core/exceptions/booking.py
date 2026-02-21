@@ -1,0 +1,62 @@
+# app/core/exceptions/booking.py
+"""שגיאות דומיין הזמנות ונהג/נוסע."""
+from typing import Optional
+from .base import LinkupError
+
+
+class RideNotAvailableError(LinkupError):
+    """הנסיעה אינה פתוחה להצטרפות או לא נמצאה."""
+    status_code = 404
+    error_code = "BOOKING_RIDE_NOT_AVAILABLE"
+    message = "הנסיעה אינה זמינה"
+
+    def __init__(self, ride_id: Optional[int] = None):
+        payload = {"ride_id": ride_id} if ride_id is not None else None
+        super().__init__(payload=payload)
+
+
+class BookingAlreadyExistsError(LinkupError):
+    """כבר קיימת בקשת הצטרפות לאותה נסיעה."""
+    status_code = 400
+    error_code = "BOOKING_ALREADY_EXISTS"
+    message = "כבר ביקשת להצטרף לנסיעה הזו"
+
+    def __init__(self, ride_id: Optional[int] = None, request_id: Optional[int] = None):
+        payload = {}
+        if ride_id is not None:
+            payload["ride_id"] = ride_id
+        if request_id is not None:
+            payload["request_id"] = request_id
+        super().__init__(payload=payload or None)
+
+
+class PassengerRequestNotFoundError(LinkupError):
+    """בקשת הנוסע לא נמצאה."""
+    status_code = 404
+    error_code = "BOOKING_REQUEST_NOT_FOUND"
+    message = "בקשת הנוסע לא נמצאה"
+
+    def __init__(self, request_id: Optional[int] = None):
+        payload = {"request_id": request_id} if request_id is not None else None
+        super().__init__(payload=payload)
+
+
+class BookingNotFoundError(LinkupError):
+    """הזמנה לא נמצאה."""
+    status_code = 404
+    error_code = "BOOKING_NOT_FOUND"
+    message = "הזמנה לא נמצאה"
+
+    def __init__(self, booking_id: Optional[int] = None):
+        payload = {"booking_id": booking_id} if booking_id is not None else None
+        super().__init__(payload=payload)
+
+
+class ForbiddenRideActionError(LinkupError):
+    """אין הרשאה לבצע פעולה על נסיעה/הזמנה זו."""
+    status_code = 403
+    error_code = "BOOKING_ACCESS_DENIED"
+    message = "גישה חסומה"
+
+    def __init__(self, detail: Optional[str] = None):
+        super().__init__(message=detail or self.message)

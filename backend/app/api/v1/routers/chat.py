@@ -1,0 +1,243 @@
+"""
+ראוטר צ'אט 1:1 – שיחות והודעות.
+כל ה-endpoints דורשים אימות (get_current_user).
+"""
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.session import get_db
+from app.api.dependencies.auth import get_current_user
+from app.domain.users.model import User
+from app.domain.chat.service import (
+    get_or_create_conversation,
+    get_or_create_conversation_by_booking,
+    list_my_conversations,
+    get_conversation_detail,
+    send_message,
+    get_messages,
+)
+from app.domain.chat.schema import (
+    ConversationCreate,
+    ConversationDetail,
+    ConversationListItem,
+    MessageCreate,
+    MessageResponse,
+)
+
+router = APIRouter(tags=["Chat"])
+
+
+@router.post(
+    "/conversations",
+    response_model=ConversationDetail,
+    status_code=status.HTTP_201_CREATED,
+    summary="פתיחת שיחה (או קבלת שיחה קיימת)",
+)
+async def create_or_get_conversation(
+    data: ConversationCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    מזהה או יוצר שיחת 1:1 עם other_user_id.
+    מחזיר conversation_id + פרטי הצד השני.
+    """
+    try:
+        return await get_or_create_conversation(
+            db,
+            current_user_id=current_user.user_id,
+            other_user_id=data.other_user_id,
+        )
+    except ValueError as e:
+        if "yourself" in str(e).lower() or "self" in str(e).lower():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="לא ניתן לפתוח שיחה עם עצמך",
+            )
+        if "not found" in str(e).lower():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="המשתמש לא נמצא",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+
+
+@router.post(
+    "/conversations/by-booking/{booking_id}",
+    response_model=ConversationDetail,
+    status_code=status.HTTP_201_CREATED,
+    summary="פתיחת שיחה דרך booking",
+)
+async def create_or_get_conversation_by_booking(
+    booking_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    מזהה או יוצר שיחת 1:1 בין נהג לנוסע על בסיס booking_id.
+    רק נהג או נוסע של ה-booking יכולים לפתוח שיחה,
+    ורק אם הסטטוס הוא pending_approval או confirmed.
+    """
+    try:
+        return await get_or_create_conversation_by_booking(
+            db,
+            booking_id=booking_id,
+            current_user_id=current_user.user_id,
+        )
+    except ValueError as e:
+        error_msg = str(e).lower()
+        if "not found" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="ההזמנה לא נמצאה",
+            )
+        if "can only chat" in error_msg or "status" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=str(e),
+            )
+        if "yourself" in error_msg:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="לא ניתן לפתוח שיחה עם עצמך",
+            )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+
+
+@router.get(
+    "/conversations",
+    response_model=list[ConversationListItem],
+    summary="רשימת השיחות שלי",
+)
+async def list_conversations(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """כל השיחות של המשתמש המחובר, עם פרטי הצד השני והודעה אחרונה."""
+    return await list_my_conversations(db, current_user_id=current_user.user_id)
+
+
+@router.get(
+    "/conversations/{conversation_id}",
+    response_model=ConversationDetail,
+    summary="פרטי שיחה",
+)
+async def get_conversation(
+    conversation_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """פרטי שיחה אחת – רק אם המשתמש participant."""
+    detail = await get_conversation_detail(
+        db, conversation_id=conversation_id, current_user_id=current_user.user_id
+    )
+    if not detail:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="השיחה לא נמצאה או שאין לך גישה אליה",
+        )
+    return detail
+
+
+@router.post(
+    "/conversations/{conversation_id}/messages",
+    response_model=MessageResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="שליחת הודעה",
+)
+async def post_message(
+    conversation_id: int,
+    data: MessageCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """שולח הודעה בשיחה. רק participant יכול לשלוח."""
+    msg = await send_message(
+        db,
+        conversation_id=conversation_id,
+        sender_id=current_user.user_id,
+        body=data.body,
+    )
+    if not msg:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="השיחה לא נמצאה או שאין לך גישה אליה",
+        )
+    return msg
+
+
+@router.get(
+    "/conversations/{conversation_id}/messages",
+    response_model=list[MessageResponse],
+    summary="היסטוריית הודעות",
+)
+async def list_conversation_messages(
+    conversation_id: int,
+    limit: int = Query(50, ge=1, le=100),
+    before_message_id: int | None = Query(None, description="לפני הודעה (pagination)"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """הודעות בשיחה (pagination). רק participant יכול לצפות."""
+    messages = await get_messages(
+        db,
+        conversation_id=conversation_id,
+        current_user_id=current_user.user_id,
+        limit=limit,
+        before_message_id=before_message_id,
+    )
+    if messages is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="השיחה לא נמצאה או שאין לך גישה אליה",
+        )
+    return messages
+
+
+@router.get(
+    "/conversations/{conversation_id}/calendar.ics",
+    summary="ייצוא שיחה ללוח שנה (iCal)",
+    response_class=Response,
+)
+async def export_conversation_calendar(
+    conversation_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    מייצא את השיחה לקובץ iCal (.ics) ללוח שנה.
+    דורש ניתוח AI קיים או מנתח על המקום.
+    """
+    from app.domain.chat.calendar_export import get_conversation_for_calendar_export
+    from app.domain.chat.calendar.exporter import export_rides_to_ical_bytes
+    from app.domain.chat.schema_ai import RideSummary
+    from datetime import datetime
+    
+    # איסוף נתוני שיחה
+    conv_data = await get_conversation_for_calendar_export(
+        db, conversation_id, current_user.user_id
+    )
+    if not conv_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="השיחה לא נמצאה או שאין לך גישה אליה",
+        )
+    
+    # TODO: כאן צריך לנתח את השיחה או להשתמש בתוצאות קיימות
+    # כרגע - placeholder - צריך לשלב עם AI analyzer
+    # בינתיים נחזיר שגיאה אם אין ניתוח
+    
+    # יצירת RideSummary מהודעות (placeholder - צריך ניתוח AI אמיתי)
+    # ride = RideSummary(...)
+    # ical_bytes = export_rides_to_ical_bytes([ride])
+    
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="ייצוא ללוח שנה דורש ניתוח AI - עדיין לא מומש",
+    )

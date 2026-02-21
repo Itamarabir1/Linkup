@@ -1,0 +1,156 @@
+services:
+  # --- Database: PostgreSQL + PostGIS ---
+  db:
+    image: postgis/postgis:15-3.3
+    container_name: linkup_db
+    restart: always
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: linkup_app
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d linkup_app"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - linkup_network
+
+  # --- Cache & Geo-Search: Redis Stack ---
+  redis:
+    image: redis/redis-stack:latest
+    container_name: linkup_redis
+    command: ["redis-server", "--requirepass", "password123"]
+    environment:
+      - REDIS_ARGS=--requirepass password123
+    ports:
+      - "6379:6379"
+    networks:
+      - linkup_network
+
+  # --- Message Broker: RabbitMQ ---
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: linkup_rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"   # פורט תקשורת (AMQP)
+      - "15672:15672" # ממשק ניהול גרפי
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - linkup_network
+  # --- Outbox & Notifications Worker: מעבד אירועים מה-outbox ושולח מייל/פוש (רישום, בקשת הצטרפות, וכו') ---
+  outbox-worker:
+    build: ./backend
+    container_name: linkup_outbox_worker
+    command: python -m app.workers.main_worker
+    volumes:
+      - ./backend:/app
+    env_file:
+      - ./backend/.env
+    environment:
+      - POSTGRES_HOST=db
+      - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - linkup_network
+    restart: unless-stopped
+    # רץ יחד עם backend – בלי ה-worker לא נשלחים מיילים (אימות, בקשת הצטרפות לנהג, וכו')
+
+  # --- Streaming: Kafka & Zookeeper ---
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: linkup_kafka
+    ports:
+      - "9092:9092"
+    environment:
+      # --- הגדרות KRaft (מחליף את Zookeeper) ---
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      
+      # --- מאזינים ורשת ---
+      # 9092: לתקשורת מה-Python שלך (localhost)
+      # 29092: לתקשורת בין קונטיינרים בתוך linkup_network
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      
+      # --- הגדרות כלליות ---
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      
+      # מפתח ייחודי ל-Cluster (חובה ב-KRaft)
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk' 
+    networks:
+      - linkup_network
+  # --- Backend: FastAPI ---
+  backend:
+    build: ./backend
+    container_name: linkup_backend
+    restart: on-failure
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    env_file:
+      - ./backend/.env
+    environment:
+      - POSTGRES_HOST=db
+      - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
+      - DOCKER_MODE=true
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+    networks:
+      - linkup_network
+
+  # --- WebSocket: Chat (Go) ---
+  chat-ws:
+    build:
+      context: ./chat-ws
+      dockerfile: Dockerfile.go
+    container_name: linkup_chat_ws
+    restart: on-failure
+    ports:
+      - "8081:8081"
+    env_file:
+      - ./backend/.env
+    environment:
+      - PORT=8081
+      - REDIS_URL=redis://:password123@redis:6379/0
+      - JWT_ALGORITHM=HS256
+    depends_on:
+      redis:
+        condition: service_started
+    networks:
+      - linkup_network
+
+networks:
+  linkup_network:
+    driver: bridge
+
+volumes:
+  postgres_data:

@@ -1,0 +1,111 @@
+# --- Environment & secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+*.mobileprovision
+# Firebase / Google Cloud (never commit real keys)
+**/firebase-credentials.json
+**/*-credentials.json
+!**/*-credentials.example.json
+
+# --- Python (backend, workers) ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# --- Node (frontend, mobile, etc.) ---
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+*.tsbuildinfo
+next-env.d.ts
+
+# --- Build & output ---
+dist/
+dist-ssr/
+out/
+.next/
+*.local
+/coverage
+web-build/
+
+# --- IDE & editor ---
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*~
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# --- Logs ---
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# --- Docker (local overrides, keep compose in repo) ---
+# (docker-compose.yml is committed; add here if you add docker-compose.override.yml with secrets)
+
+# --- Database dumps & local data ---
+*.sql.backup
+*.dump
+postgres_data/
+
+# --- Misc ---
+*.bak
+*.tmp
+.cache/
+celerybeat-schedule
+celerybeat.pid

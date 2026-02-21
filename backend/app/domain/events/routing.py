@@ -1,0 +1,84 @@
+"""
+מקור אמת יחיד ל-metadata של אירועים: exchange ו-routing_key.
+מתאים לכל מערכת הנוטיפיקציות – ה-Worker והצרכנים מצפים לנתונים האלו.
+
+כללים (גישה סניורית: הפרדה לפי מטרה, לא לפי ישות):
+- exchange = סוג העבודה (מטרה), לא "שיוך למשתמש". לכן:
+  - "user" (ו-ride, booking) = אירועים שמסתיימים בשליחת התראה (מייל/פוש). רישום, איפוס סיסמה, user.registered → כולם exchange "user".
+  - "tasks" = משימות כבדות/אסינכרוניות (S3, עיבוד קבצים). העלאת אווטאר → exchange "tasks".
+- גם רישום וגם איפוס סיסמה וגם העלאת תמונה קשורים ל-user, אבל רישום ואיפוס = "שלח מייל" (אותו consumer), העלאת תמונה = "עבד קובץ ב-S3" (consumer אחר). לכן שני exchanges: user vs tasks.
+- routing_key = מזהה האירוע בתוך ה-exchange: auth.email_verification, auth.password_reset_code, user.avatar_upload.
+
+האם בלאגן כשיש שני תורים לאותו exchange?
+  לא. אצלנו אין שני תורים לאותו exchange: notifications_queue מקשיב ל-user/ride/booking; avatar_upload_queue מקשיב רק ל-tasks. אין חפיפה.
+  אם היו שני תורים קשורים לאותו exchange עם אותו routing pattern – כל הודעה הייתה מגיעה לשניהם (fan-out). זה רצוי רק כששני צרכנים צריכים את אותה הודעה; אחרת מפרידים ב-exchange או ב-routing pattern.
+
+מתי להחליף מפתח (routing_key)?
+  כשמוסיפים סוג אירוע חדש באותו סוג עיבוד (אותו exchange). לדוגמה auth.email_verification vs auth.password_reset_code – מפתח שונה, אותו exchange "user".
+
+מתי לשנות exchange?
+  כשמשנים סוג העבודה: התראות (user/ride/booking) vs משימות כבדות (tasks). או דומיין עסקי אחר (ride, booking).
+
+מה קובע כמות תורים וכמות וורקרים?
+  - תור אחד לכל "סוג צריכה": notifications_queue להתראות, avatar_upload_queue למשימות S3.
+  - כל תור מקשיב ל-exchange(es) שמתאימים לו בלבד. לא מערבבים התראות ומשימות כבדות באותו תור.
+"""
+from typing import Dict, Any, List
+
+# קידומת event_name → exchange
+_EXCHANGE_BY_PREFIX: Dict[str, str] = {
+    "auth.": "user",
+    "user.": "user",
+    "ride.": "ride",
+    "booking.": "booking",
+    "chat.": "user",  # אירועי צ'אט הולכים ל-exchange "user" (אותו consumer של notifications)
+}
+
+DEFAULT_EXCHANGE = "system_events"
+TASKS_EXCHANGE = "tasks"
+
+# משימות כבדות (העלאת תמונה וכו') – תור נפרד מ-notifications
+_TASK_EVENT_NAMES: List[str] = [
+    "user.avatar_upload",
+    "user.avatar_remove",
+]
+
+# תור הנוטיפיקציות מקשיב לכל ה-exchanges האלו (תור אחד, וורקר אחד לכל המיילים/פוש)
+NOTIFICATION_EXCHANGES: List[str] = [
+    "user",
+    "ride",
+    "booking",
+    DEFAULT_EXCHANGE,
+]
+
+# תור העלאת אווטאר (ותמונה/קבצים) מקשיב ל-tasks
+AVATAR_UPLOAD_EXCHANGES: List[str] = [TASKS_EXCHANGE]
+
+# משימות מתוזמנות (maintenance, reminders, fuel) – תור ייעודי, לא אירועים
+SCHEDULED_EXCHANGE = "scheduled"
+SCHEDULED_TASKS_QUEUE = "scheduled_tasks_queue"
+SCHEDULED_EXCHANGES: List[str] = [SCHEDULED_EXCHANGE]
+
+# routing_key למשימות מתוזמנות (נשלח ע"י המתזמן, מפורש ע"י ה-consumer)
+ROUTING_KEY_FUEL_SCAN = "fuel_scan"
+ROUTING_KEY_MAINTENANCE = "maintenance"
+ROUTING_KEY_REMINDERS = "reminders"
+ROUTING_KEY_CHAT_TIMEOUT = "chat_timeout"
+
+
+def get_routing_metadata(event_name: str) -> Dict[str, Any]:
+    """
+    מחזיר metadata לשליחה ל-RabbitMQ: exchange ו-routing_key.
+    אירועי משימות (avatar_upload) → exchange "tasks"; שאר אירועים → לפי קידומת דומיין.
+    """
+    if event_name in _TASK_EVENT_NAMES:
+        return {"exchange": TASKS_EXCHANGE, "routing_key": event_name}
+    exchange = DEFAULT_EXCHANGE
+    for prefix, ex in _EXCHANGE_BY_PREFIX.items():
+        if event_name.startswith(prefix):
+            exchange = ex
+            break
+    return {
+        "exchange": exchange,
+        "routing_key": event_name,
+    }

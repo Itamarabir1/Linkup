@@ -1,0 +1,12 @@
+# Ignore Dockerfiles (they're not Go code)
+Dockerfile
+Dockerfile.go
+
+# Ignore other non-Go files
+*.md
+*.yml
+*.yaml
+Makefile
+TrempFlow/
+ai/
+*.sh

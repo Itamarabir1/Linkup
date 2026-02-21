@@ -1,0 +1,456 @@
+.page {
+  padding: 1rem 1.5rem;
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: right;
+}
+
+.page-title {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.page-loading,
+.empty-text {
+  text-align: center;
+  color: #6b7280;
+  padding: 2rem;
+}
+
+.page-error {
+  color: #dc2626;
+  margin-bottom: 1rem;
+}
+
+.form-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.form-label {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.form-row-with-btn {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.form-row-with-btn .form-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.form-input {
+  width: 100%;
+  max-width: 400px;
+  padding: 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  box-sizing: border-box;
+  text-align: right;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.btn {
+  display: inline-block;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  text-align: center;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: #1d4ed8;
+}
+
+.btn-success {
+  background: #059669;
+  color: #fff;
+}
+
+.btn-success:hover {
+  background: #047857;
+}
+
+.btn-danger {
+  background: #dc2626;
+  color: #fff;
+  margin-top: 1rem;
+}
+
+.btn-danger:hover {
+  background: #b91c1c;
+}
+
+.card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.card {
+  background: #fff;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  border-right: 4px solid #2563eb;
+}
+
+.card-request {
+  border-right-color: #059669;
+}
+
+.card-route {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.card-meta {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+.card-route-summary {
+  font-style: italic;
+  color: #4b5563;
+}
+
+.page-subtitle {
+  font-size: 1.2rem;
+  margin: 0 0 0.5rem 0;
+}
+
+.preview-card {
+  margin-top: 1.5rem;
+}
+
+.preview-card .btn {
+  margin-top: 1rem;
+}
+
+.route-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.route-option {
+  cursor: pointer;
+  text-align: right;
+  transition: border-color 0.2s, background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.route-option-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.route-option:hover {
+  background: #f9fafb;
+}
+
+.btn-route-map {
+  flex-shrink: 0;
+  font-size: 0.9rem;
+  padding: 0.45rem 0.85rem;
+  background: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #93c5fd;
+}
+
+.btn-route-map:hover {
+  background: #dbeafe;
+}
+
+.route-option-selected,
+.route-option-selected:hover {
+  border-right-width: 6px;
+  border-right-color: #047857;
+  background: #6ee7b7;
+  border-color: #059669;
+}
+
+.profile-card {
+  margin-bottom: 1rem;
+}
+
+.profile-avatar-block {
+  text-align: center;
+  margin-bottom: 1.25rem;
+}
+
+.profile-avatar-wrap {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #e5e7eb;
+  margin: 0 auto;
+}
+
+.profile-avatar-clickable {
+  cursor: pointer;
+}
+
+.profile-avatar-clickable:hover {
+  opacity: 0.95;
+}
+
+.profile-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.profile-avatar-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.25rem;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.profile-avatar-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.profile-avatar-links {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+.profile-avatar-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.9rem;
+  color: #2563eb;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.profile-avatar-link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.profile-avatar-link:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.profile-avatar-link-muted {
+  color: #6b7280;
+}
+
+.profile-avatar-link-muted:hover:not(:disabled) {
+  color: #374151;
+}
+
+.profile-avatar-link-sep {
+  color: #d1d5db;
+  font-weight: 300;
+}
+
+/* מודל תמונה מוגדלת */
+.avatar-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+.avatar-modal-close {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 1.5rem;
+  line-height: 1;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.avatar-modal-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+[dir="rtl"] .avatar-modal-close {
+  left: auto;
+  right: 1rem;
+}
+
+.avatar-modal-img {
+  max-width: 100%;
+  max-height: 85vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.btn-outline {
+  background: transparent;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.btn-outline:hover {
+  background: #f3f4f6;
+}
+
+.profile-row {
+  margin-top: 0.75rem;
+}
+
+.profile-row:first-child {
+  margin-top: 0;
+}
+
+.profile-label {
+  display: block;
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.profile-value {
+  font-size: 1rem;
+}
+
+/* מודל אישור מחיקת נסיעה */
+.confirm-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.confirm-modal-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  max-width: 360px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+.confirm-modal-title {
+  font-size: 1.1rem;
+  margin: 0 0 1rem 0;
+  color: #111;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1.25rem;
+}
+
+.confirm-modal-actions .btn {
+  width: 120px;
+  min-width: 120px;
+  padding: 0.6rem 1rem;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.card-ride-wrap {
+  position: relative;
+}
+
+/* כפתור המחיקה בצד שמאל של הכרטיס (ב-RTL לא על המוצא) */
+.card-ride-delete-btn {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+  font-size: 1.25rem;
+  line-height: 1;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: background 0.2s, color 0.2s;
+}
+
+.card-ride-delete-btn:hover {
+  background: rgba(220, 38, 38, 0.25);
+}
+
+/* ב-RTL הכפתור נשאר בשמאל (left) כדי לא לכסות את "קצרין" */
