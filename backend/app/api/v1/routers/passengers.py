@@ -1,12 +1,22 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session
-from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 from datetime import datetime
 from typing import List, Optional
 
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
+from app.api.dependencies.auth import get_current_user, get_current_user_optional
 from app.db.session import get_db
+from app.core.exceptions.booking import (
+    BookingAlreadyExistsError,
+    ForbiddenRideActionError,
+    PassengerRequestNotFoundError,
+    RideNotAvailableError,
+)
+from app.core.exceptions.infrastructure import GeocodingError
+from app.domain.bookings.schema import BookingResponse
+from app.domain.bookings.service import BookingService
 from app.domain.passengers.schema import (
     PassengerRequestCreate,
     PassengerRequestResponse,
@@ -16,17 +26,13 @@ from app.domain.passengers.schema import (
     RequestRideFromSearch,
     RideSearchResponse,
 )
-from app.domain.rides.schema import RideResponse, DriverInfoResponse
-from app.domain.bookings.schema import BookingResponse
 from app.domain.passengers.service import PassengerService
+from app.domain.rides.schema import DriverInfoResponse, RideResponse
 from app.domain.users.model import User
-from app.api.dependencies.auth import get_current_user, get_current_user_optional
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/passengers", tags=["Passengers"])
-
-# Sub-router for passenger-facing ride endpoints: /passenger/rides/...
 passenger_rides_router = APIRouter(prefix="/rides", tags=["Passenger"])
 
 
@@ -35,14 +41,14 @@ passenger_rides_router = APIRouter(prefix="/rides", tags=["Passenger"])
 async def get_my_requests(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    status: Optional[str] = Query(
+    request_status: Optional[str] = Query(
         None,
         description="סנן לפי סטטוס: pending, approved, cancelled, matched, expired, completed, rejected",
     ),
 ):
     """רשימת הבקשות שלי כנוסע."""
     return await PassengerService.get_my_requests(
-        db, current_user.user_id, status=status
+        db, current_user.user_id, status=request_status
     )
 
 
@@ -80,9 +86,7 @@ def update_notification_status(
     update_data: PassengerRequestUpdateNotifications,
     db: Session = Depends(get_db),
 ):
-    """
-    מעדכן האם הנוסע מעוניין לקבל התראות אקטיביות עבור בקשה זו.
-    """
+    """מעדכן האם הנוסע מעוניין לקבל התראות אקטיביות עבור בקשה זו."""
     return PassengerService.toggle_request_notifications(db, request_id, update_data)
 
 
@@ -119,29 +123,13 @@ async def request_ride_from_search(
     current_user: User = Depends(get_current_user),
 ):
     """משתמש ב-request_id מהחיפוש (אם קיים) או יוצר חדש. יוצר Booking, כותב אירוע ל-Outbox; ה-Worker שולח מייל לנהג."""
-    import logging
-
-    _log = logging.getLogger(__name__)
-    print(
-        f"[NOTIF] API: request_ride_from_search START ride_id={body.ride_id}, request_id={body.request_id}",
-        flush=True,
-    )
-    _log.info(
+    logger.info(
         "[NOTIF] API: request_ride_from_search called ride_id=%s, request_id=%s",
         body.ride_id,
         body.request_id,
     )
-    from app.domain.bookings.service import BookingService
-    from app.core.exceptions.booking import (
-        RideNotAvailableError,
-        BookingAlreadyExistsError,
-        PassengerRequestNotFoundError,
-    )
-    from app.core.exceptions.infrastructure import GeocodingError
-
     try:
         request_id = body.request_id
-        # אם אין request_id, יצור אחד (edge case - לא אמור לקרות אם החיפוש עובד נכון)
         if not request_id:
             new_request = await db.run_sync(
                 lambda sync_db: (
@@ -199,7 +187,6 @@ async def search_available_rides(
             search_radius=search_radius,
             departure_time=departure_time,
         )
-        # המרת AsyncSession ל-Session sync באמצעות run_sync
         result = await db.run_sync(
             lambda sync_db: PassengerService.search_rides_for_passenger(
                 sync_db, search_data
@@ -221,11 +208,6 @@ async def cancel_request(
     current_user: User = Depends(get_current_user),
 ):
     """מבטל את הבקשה ומשחרר אוטומטית את כל המושבים שנתפסו מול נהגים (רק לבעל הבקשה)."""
-    from app.core.exceptions.booking import (
-        PassengerRequestNotFoundError,
-        ForbiddenRideActionError,
-    )
-
     try:
         return await db.run_sync(
             lambda sess: PassengerService.cancel_request(
@@ -252,11 +234,10 @@ def get_latest_matches(request_id: int, db: Session = Depends(get_db)):
     "/all", response_model=List[RideResponse], summary="תצוגת כל הנסיעות (ניהול ובקרה)"
 )
 def get_all_rides_admin(
-    status: str = Query(None, description="סנן לפי סטטוס: open, cancelled, completed"),
+    filter_status: str = Query(
+        None, description="סנן לפי סטטוס: open, cancelled, completed"
+    ),
     db: Session = Depends(get_db),
 ):
-    """
-    מחזיר את כל הנסיעות במערכת.
-    אם נשלח סטטוס, יחזיר רק נסיעות בסטטוס הזה.
-    """
-    return PassengerService.get_all_rides_for_admin(db, status=status)
+    """מחזיר את כל הנסיעות במערכת. אם נשלח סטטוס, יחזיר רק נסיעות בסטטוס הזה."""
+    return PassengerService.get_all_rides_for_admin(db, status=filter_status)
