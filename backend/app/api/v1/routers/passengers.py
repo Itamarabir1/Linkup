@@ -2,10 +2,6 @@ import logging
 from datetime import datetime
 from typing import List, Optional
 
-
-
-
-
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
@@ -18,6 +14,9 @@ from app.core.exceptions.booking import (
     PassengerRequestNotFoundError,
     RideNotAvailableError,
 )
+
+
+
 from app.core.exceptions.infrastructure import GeocodingError
 from app.domain.bookings.schema import BookingResponse
 from app.domain.bookings.service import BookingService
