@@ -5,6 +5,7 @@ import logging
 from datetime import datetime
 from typing import List, Optional
 
+
 from app.db.session import get_db
 from app.domain.passengers.schema import (
     PassengerRequestCreate,
