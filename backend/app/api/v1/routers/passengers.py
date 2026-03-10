@@ -248,4 +248,4 @@ def get_all_rides_admin(
 ):
     """מחזיר את כל הנסיעות במערכת. אם נשלח סטטוס, יחזיר רק נסיעות בסטטוס הזה."""
     return PassengerService.get_all_rides_for_admin(db, status=filter_status)
-print("hello world")    
+print("hello world hbjkbkdbsj")    
