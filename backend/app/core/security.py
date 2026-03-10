@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from jose import jwt
+
+from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 # ייבוא האובייקט שטוען את ה-ENV
@@ -51,9 +52,6 @@ def create_refresh_token(data: dict) -> str:
         settings.SECRET_KEY,
         algorithm=settings.ALGORITHM,
     )
-
-
-from jose import JWTError
 
 
 def decode_access_token(token: str) -> dict:

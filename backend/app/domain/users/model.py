@@ -99,7 +99,4 @@ class User(Base):
             "is_verified": self.is_verified,
         }
 
-    def __repr__(self):
-        return f"<User(user_id={self.user_id}, full_name='{self.full_name}')>"
-
     # בתוך class User במודל שלך

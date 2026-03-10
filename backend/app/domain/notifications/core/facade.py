@@ -1,8 +1,7 @@
 import logging
 from typing import Any, Dict
 
-# ייבוא השגיאה המותאמת שלך
-from app.core.exceptions.handlers import LinkupError
+from app.core.exceptions.base import LinkupError
 
 # logger = logging.getLogger(__name__)
 
@@ -92,9 +91,7 @@ from app.core.exceptions.handlers import LinkupError
 #             )
 
 from .builders.registry import CONTEXT_MAP
-
 from app.domain.notifications.constants import NotificationEvent
-from app.core.exceptions.base import LinkupError
 
 logger = logging.getLogger(__name__)
 

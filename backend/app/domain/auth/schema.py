@@ -230,14 +230,3 @@ class GoogleSignInRequest(BaseModel):
     id_token: str = Field(
         ..., min_length=100, description="Google ID token (JWT) מ-Google Sign-In"
     )
-
-
-class GoogleSignInRequest(BaseModel):
-    """
-    סכמה לבקשת התחברות דרך Google OAuth.
-    מקבל ID token מ-Google Sign-In (JWT).
-    """
-
-    id_token: str = Field(
-        ..., description="Google ID token (JWT) received from Google Sign-In"
-    )

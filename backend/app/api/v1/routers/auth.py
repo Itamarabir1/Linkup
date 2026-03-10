@@ -1,14 +1,12 @@
+import logging
+
 from fastapi import APIRouter, Depends, status, Query, Request, HTTPException
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-import logging
 
 from app.api.dependencies.auth import get_db, get_current_user
 from app.api.dependencies.rate_limit import rate_limit_auth
 from app.core.config import settings
-from app.domain.users.model import User
-
-logger = logging.getLogger(__name__)
 from app.domain.auth.schema import (
     UserRegister,
     UserOut,
@@ -25,6 +23,9 @@ from app.domain.auth.schema import (
     GoogleSignInRequest,
 )
 from app.domain.auth.service import auth_service
+from app.domain.users.model import User
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 

@@ -42,7 +42,7 @@ class RedisClient:
                 return None
             try:
                 return json.loads(data)
-            except:
+            except Exception:
                 return data
         except Exception as e:
             raise InfrastructureError(f"Redis GET failed: {key}", detail=str(e))

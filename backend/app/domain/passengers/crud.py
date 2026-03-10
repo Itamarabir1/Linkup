@@ -257,7 +257,7 @@ class CRUDPassenger:
                 func.date(PassengerRequest.requested_departure_time) <= max_date,
                 func.date(PassengerRequest.requested_departure_time) >= min_date,
                 PassengerRequest.passenger_id != driver_id,
-                PassengerRequest.is_notification_active == True,
+                PassengerRequest.is_notification_active,
             )
             .count()
         )
@@ -279,7 +279,7 @@ class CRUDPassenger:
                 func.date(PassengerRequest.requested_departure_time) <= max_date,
                 func.date(PassengerRequest.requested_departure_time) >= min_date,
                 PassengerRequest.passenger_id != driver_id,
-                PassengerRequest.is_notification_active == True,
+                PassengerRequest.is_notification_active,
                 # יעד בטווח של 5 ק"מ מהיעד של הנסיעה
                 func.ST_DWithin(
                     cast(PassengerRequest.destination_geom, Geography),

@@ -173,8 +173,6 @@ class NotificationHandler:
                 and "user_id_2" in resolved
             ):
                 # שליחה לשני משתמשים
-                from app.domain.users.crud import crud_user
-
                 user1 = await crud_user.get(db, id=resolved["user_id_1"])
                 user2 = await crud_user.get(db, id=resolved["user_id_2"])
 

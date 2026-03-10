@@ -1,5 +1,6 @@
 from __future__ import annotations
-from sqlalchemy.orm import Session, joinedload
+
+from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 from datetime import datetime
@@ -420,9 +421,6 @@ class CRUDBooking:
         return query.order_by(Booking.created_at.desc()).all()
 
 
-from sqlalchemy.orm import selectinload
-
-
 # בתוך קלאס ה-CRUDBooking
 async def get_bookings_for_reminders(
     self,
@@ -450,7 +448,7 @@ async def get_bookings_for_reminders(
         .where(
             and_(
                 Booking.status == "confirmed",
-                Booking.reminder_sent == False,
+                ~Booking.reminder_sent,
                 Booking.pickup_time >= start_window,
                 Booking.pickup_time <= end_window,
             )

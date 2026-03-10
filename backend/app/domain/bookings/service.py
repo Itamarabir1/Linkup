@@ -162,7 +162,7 @@ class BookingService:
         אירועים דרך Outbox – ה-Worker ישלח הודעות לנוסעים.
         """
         try:
-            req_ids = await db.run_sync(_cancel_ride_sync, ride_id, driver_id)
+            await db.run_sync(_cancel_ride_sync, ride_id, driver_id)
             try:
                 await publish_to_outbox(
                     db,

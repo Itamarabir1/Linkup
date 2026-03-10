@@ -1,7 +1,7 @@
 import logging
 import re
+
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse

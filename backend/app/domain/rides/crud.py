@@ -194,7 +194,7 @@ class CRUDRide:
             .filter(
                 and_(
                     Booking.status == "confirmed",
-                    Booking.reminder_sent == False,
+                    ~Booking.reminder_sent,
                     Booking.pickup_time >= start_window,
                     Booking.pickup_time <= end_window,
                 )
@@ -224,7 +224,7 @@ class CRUDRide:
             .where(
                 and_(
                     Ride.status == RideStatus.OPEN,
-                    Ride.reminder_sent == False,
+                    ~Ride.reminder_sent,
                     Ride.departure_time >= start_window,
                     Ride.departure_time <= end_window,
                 )

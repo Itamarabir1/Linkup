@@ -61,7 +61,7 @@ async def handle_conversation_completion(
             return False
 
         # שמירה ב-DB
-        analysis = await create_analysis(
+        await create_analysis(
             db=db,
             conversation_id=conversation_id,
             driver_name=ride_summary.driver_name,

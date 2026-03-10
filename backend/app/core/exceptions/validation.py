@@ -75,33 +75,6 @@ class FileTooLargeError(LinkupError):
         )
 
 
-class InvalidEmailError(LinkupError):
-    def __init__(self, email: str):
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "message": f"כתובת האימייל שהוזנה אינה תקינה: {email}",
-                "error_code": "AUTH_INVALID_EMAIL",
-                "payload": {"email": email},
-            },
-        )
-
-
-class InvalidPhoneError(LinkupError):
-    def __init__(self, phone: str):
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={
-                "message": f"מספר הטלפון אינו תקין (נדרש מספר ישראלי תקני): {phone}",
-                "error_code": "AUTH_INVALID_PHONE",
-                "payload": {"phone": phone},
-            },
-        )
-
-
-from app.core.exceptions.base import LinkupError  # או מאיפה שאתה מייבא את ה-Base
-
-
 class InvalidLocationError(LinkupError):
     status_code = 400
     error_code = "INVALID_LOCATION"
@@ -116,23 +89,6 @@ class InvalidLocationError(LinkupError):
         super().__init__(
             message=full_message,
             payload={"latitude": lat, "longitude": lon, "detail": detail},
-        )
-
-
-from app.core.exceptions.base import LinkupError
-
-
-class InvalidLocationError(LinkupError):
-    """
-    נזרקת כאשר כתובת או קואורדינטות אינן תקינות
-    או שלא ניתן למצוא עבורן מסלול במפות.
-    """
-
-    def __init__(self, detail: str = "מיקום לא תקין או לא נמצא"):
-        super().__init__(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=detail,
-            error_code="INVALID_LOCATION",
         )
 
 

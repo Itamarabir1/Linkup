@@ -84,9 +84,6 @@ class InvalidPasswordError(LinkupError):
         super().__init__(message=self.message, status_code=self.status_code)
 
 
-from .base import LinkupError
-
-
 class PasswordTooWeakError(LinkupError):
     def __init__(self, details: str = None):
         description = (

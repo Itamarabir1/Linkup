@@ -161,9 +161,6 @@ async def list_my_conversations(
     convs = await chat_crud.list_conversations_for_user(db, current_user_id)
     out = []
     for conv in convs:
-        partner_user_id = (
-            conv.user_id_2 if conv.user_id_1 == current_user_id else conv.user_id_1
-        )
         partner_user = conv.user_2 if conv.user_id_1 == current_user_id else conv.user_1
         partner = ConversationPartner(
             user_id=partner_user.user_id,
