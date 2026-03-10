@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import List, Dict, Any
 
 from app.api.websockets.notifications import broadcast
-from app.domain.geo.schemas import LocationUpdate
+from app.domain.geo.schema import LocationUpdate
 
 logger = logging.getLogger(__name__)
 

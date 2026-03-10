@@ -1,7 +1,7 @@
 # app/domain/notifications/services/orchestrator.py
 import logging
 from app.domain.rides.model import Ride
-from backend.app.infrastructure.events.dispacher.base import dispatch
+from app.infrastructure.events.dispatcher.base import dispatch
 from app.core.exceptions import NotificationError
 
 logger = logging.getLogger(__name__)

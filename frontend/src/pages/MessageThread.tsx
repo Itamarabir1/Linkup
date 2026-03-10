@@ -9,7 +9,7 @@ import {
   type MessageResponse,
 } from '../api/client';
 import { formatDateTimeNoSeconds } from '../utils/date';
-import './AppPages.css';
+import styles from './MessageThread.module.css';
 
 export default function MessageThread() {
   const { conversationId } = useParams<{ conversationId: string }>();
@@ -69,7 +69,7 @@ export default function MessageThread() {
 
   if (loading) {
     return (
-      <div className="page">
+      <div className={styles.page}>
         <p className="page-loading">טוען שיחה...</p>
       </div>
     );
@@ -77,9 +77,9 @@ export default function MessageThread() {
 
   if (error && !conversation) {
     return (
-      <div className="page">
-        <p className="page-error">{error}</p>
-        <Link to="/messages" className="btn btn-outline" style={{ marginTop: '1rem' }}>
+      <div className={styles.page}>
+        <p className={styles.pageError}>{error}</p>
+        <Link to="/messages" className={`${styles.btn} ${styles.btnOutline}`} style={{ marginTop: '1rem' }}>
           חזרה להודעות
         </Link>
       </div>
@@ -89,16 +89,16 @@ export default function MessageThread() {
   const partnerName = conversation?.partner?.full_name || `שיחה #${cid}`;
 
   return (
-    <div className="page" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div className={styles.page} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <Link to="/messages" className="btn btn-outline" style={{ fontSize: '0.875rem' }}>
+        <Link to="/messages" className={`${styles.btn} ${styles.btnOutline}`} style={{ fontSize: '0.875rem' }}>
           ← הודעות
         </Link>
-        <h1 className="page-title" style={{ margin: 0, flex: 1 }}>
+        <h1 className={styles.pageTitle} style={{ margin: 0, flex: 1 }}>
           {partnerName}
         </h1>
       </div>
-      {error && <p className="page-error">{error}</p>}
+      {error && <p className={styles.pageError}>{error}</p>}
       <div
         style={{
           flex: 1,
@@ -114,7 +114,7 @@ export default function MessageThread() {
         }}
       >
         {messages.length === 0 ? (
-          <p className="empty-text" style={{ margin: 'auto' }}>
+          <p className={styles.emptyText} style={{ margin: 'auto' }}>
             אין הודעות. שלח הודעה ראשונה.
           </p>
         ) : (
@@ -154,11 +154,11 @@ export default function MessageThread() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="כתוב הודעה..."
-          className="form-input"
+          className={styles.formInput}
           style={{ flex: 1 }}
           maxLength={10000}
         />
-        <button type="submit" className="btn btn-success" disabled={sending || !input.trim()}>
+        <button type="submit" className={`${styles.btn} ${styles.btnSuccess}`} disabled={sending || !input.trim()}>
           {sending ? '...' : 'שלח'}
         </button>
       </form>

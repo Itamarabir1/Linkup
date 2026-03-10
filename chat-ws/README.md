@@ -1,14 +1,14 @@
-# chat-ws – WebSocket server for real-time chat + AI analysis
+# chat-ws – WebSocket server for real-time chat
 
-שרת WebSocket נפרד (Go) לצ'אט real-time + שירות ניתוח AI (Python). עובד יחד עם ה־API ב־Python (FastAPI).
+שרת WebSocket נפרד (Go) לצ'אט real-time. עובד יחד עם ה־API ב־Python (FastAPI). ניתוח AI של שיחות רץ ב-backend worker (outbox-worker).
 
 ## איך זה משתלב בפרויקט
 
 - **תיקייה נפרדת:** `chat-ws/` ברמת שורש הפרויקט (ליד `backend/` ו־`frontend/`).
-- **שלושה processes נפרדים:**
-  - **backend (Python):** REST API, DB, שליחת הודעות (POST) + publish ל־Redis.
+- **שני processes ל-chat:**
+  - **backend (Python):** REST API, DB, שליחת הודעות (POST) + publish ל־Redis; בסיום שיחה מפרסם אירוע ל-Redis DB 1.
   - **chat-ws (Go):** WebSocket, Subscribe ל־Redis, דחיפה ל־clients.
-  - **ai/service (Python):** ניתוח AI של שיחות צ'אט, מאזין ל-Redis, מפרסם תוצאות.
+- **ניתוח AI:** רץ ב־outbox-worker (backend): מאזין ל-Redis DB 1 לאירועי סיום שיחה, מנתח (Groq), שומר ל-DB.
 
 ## מבנה תיקיות
 
@@ -21,25 +21,6 @@ chat-ws/
 │   ├── redis/          # Redis subscriber
 │   ├── auth/           # JWT validation
 │   └── config/         # Configuration
-├── ai/                  # Python AI analysis
-│   ├── analyzer/       # מנתח שיחות (Groq API)
-│   │   ├── analyzer.py # ניתוח שיחה אחת
-│   │   ├── batch.py    # ניתוח batch
-│   │   ├── retry.py    # לוגיקת retry
-│   │   ├── client.py   # Groq client
-│   │   ├── prompts.py  # Prompts למודל
-│   │   └── schema.py   # RideSummary models
-│   └── service/        # שירות ניתוח AI (מאזין ל-Redis)
-│       ├── service.py   # ChatAnalyzerService (main logic)
-│       ├── cache.py     # ניהול cache של הודעות
-│       ├── publisher.py # פרסום תוצאות ניתוח
-│       ├── config.py    # קונפיגורציה וקבועים
-│       └── chat_analyzer_service.py  # Backward compatibility
-│       ├── service.py   # ChatAnalyzerService (main logic)
-│       ├── cache.py     # ניהול cache של הודעות
-│       ├── publisher.py # פרסום תוצאות ניתוח
-│       ├── config.py    # קונפיגורציה וקבועים
-│       └── chat_analyzer_service.py  # Backward compatibility
 └── README.md
 ```
 
@@ -50,9 +31,8 @@ chat-ws/
 1. **Redis** חייב לרוץ (אותו Redis של ה־backend).
 2. **משתני סביבה** (אותם כמו ב־backend, או ב־`.env` בשורש):
    - `SECRET_KEY` – אותו סוד כמו ב־Python (לאימות JWT).
-   - `REDIS_URL` – למשל `redis://localhost:6379/0`.
+   - `REDIS_URL` – למשל `redis://localhost:6379/1` (DB 1 לצ'אט).
    - `PORT` – פורט לשרת ה־WS (ברירת מחדל 8081).
-   - `GROK_API_KEY` – מפתח API של Groq לניתוח AI (נדרש רק ל-ai/service).
 
 ### 1. שרת Go WebSocket
 
@@ -69,15 +49,7 @@ cd chat-ws/cmd/server
 go run main.go
 ```
 
-### 2. שירות ניתוח AI (Python)
-
-```bash
-cd chat-ws/ai
-pip install -r requirements.txt
-python -m service.chat_analyzer_service
-```
-
-### 3. backend (Python) – כרגיל
+### 2. backend (Python) – כרגיל
 
 ```bash
 cd backend
@@ -125,11 +97,6 @@ import (
 )
 ```
 
-### בדיקת ניתוח AI
+### ניתוח AI
 
-לבדיקת ניתוח AI בנפרד (ללא Redis):
-
-```bash
-cd chat-ws/ai
-python -c "from analyzer.analyzer import analyze_ride; print(analyze_ride('יוסי: מישהו נוסע מחר? אורן: כן, ב-08:00'))"
-```
+ניתוח AI של שיחות רץ ב-backend (outbox-worker). לבדיקה: הרץ את ה-worker והפעל סיום שיחה מהאפליקציה; התוצאות נשמרות ב-DB ונגישות ב-`GET /api/v1/chat/conversations/{id}/analysis`.

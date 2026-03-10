@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import type { PassengerRequest } from '../types/api';
 import { formatDateTimeNoSeconds } from '../utils/date';
-import './AppPages.css';
+import styles from './MyRequests.module.css';
 
 const statusLabels: Record<string, string> = {
   active: 'מחפש נסיעות',
@@ -48,31 +48,31 @@ export default function MyRequests() {
 
   if (loading) {
     return (
-      <div className="page">
-        <div className="page-loading">טוען...</div>
+      <div className={styles.page}>
+        <div className={styles.pageLoading}>טוען...</div>
       </div>
     );
   }
 
   return (
-    <div className="page">
+    <div className={styles.page}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h1 className="page-title" style={{ margin: 0 }}>בקשות הטרמפ שלי</h1>
-        <Link to="/search" className="btn btn-success">
+        <h1 className={styles.pageTitle} style={{ margin: 0 }}>בקשות הטרמפ שלי</h1>
+        <Link to="/search" className={`${styles.btn} ${styles.btnSuccess}`}>
           🔍 חפש טרמפ
         </Link>
       </div>
-      {error && <p className="page-error">{error}</p>}
-      <div className="card-list">
+      {error && <p className={styles.pageError}>{error}</p>}
+      <div className={styles.cardList}>
         {requests.length === 0 ? (
-          <p className="empty-text">אין בקשות. חפש נסיעות ושמור בקשה.</p>
+          <p className={styles.emptyText}>אין בקשות. חפש נסיעות ושמור בקשה.</p>
         ) : (
           requests.map((r) => (
-            <div key={r.request_id} className="card card-request card-ride-wrap">
+            <div key={r.request_id} className={`${styles.card} ${styles.cardRequest} ${styles.cardRideWrap}`}>
               {r.status !== 'cancelled' && (
                 <button
                   type="button"
-                  className="card-ride-delete-btn"
+                  className={styles.cardRideDeleteBtn}
                   onClick={() => setRequestToCancel(r)}
                   disabled={cancelling}
                   aria-label="הסר בקשת טרמפ"
@@ -81,10 +81,10 @@ export default function MyRequests() {
                   ✕
                 </button>
               )}
-              <div className="card-route">
+              <div className={styles.cardRoute}>
                 {r.pickup_name ?? '?'} ← {r.destination_name ?? '?'}
               </div>
-              <div className="card-meta">
+              <div className={styles.cardMeta}>
                 {formatDateTimeNoSeconds(r.requested_departure_time)} ·{' '}
                 סטטוס: {statusLabels[r.status] || r.status}
               </div>
@@ -95,26 +95,26 @@ export default function MyRequests() {
 
       {requestToCancel && (
         <div
-          className="confirm-modal-backdrop"
+          className={styles.confirmModalBackdrop}
           role="dialog"
           aria-modal="true"
           aria-labelledby="confirm-cancel-request-title"
           onClick={() => (!cancelling ? setRequestToCancel(null) : null)}
         >
           <div
-            className="confirm-modal-box"
+            className={styles.confirmModalBox}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="confirm-cancel-request-title" className="confirm-modal-title">
+            <h2 id="confirm-cancel-request-title" className={styles.confirmModalTitle}>
               האם אתה בטוח שאתה רוצה להסיר את בקשת הטרמפ הזו?
             </h2>
             <p style={{ color: '#6b7280', marginTop: 0 }}>
               זה יבטל גם בקשות הצטרפות שנשלחו לנהגים (אם קיימות).
             </p>
-            <div className="confirm-modal-actions">
+            <div className={styles.confirmModalActions}>
               <button
                 type="button"
-                className="btn btn-outline"
+                className={`${styles.btn} ${styles.btnOutline}`}
                 onClick={() => setRequestToCancel(null)}
                 disabled={cancelling}
               >
@@ -122,7 +122,7 @@ export default function MyRequests() {
               </button>
               <button
                 type="button"
-                className="btn btn-danger"
+                className={`${styles.btn} ${styles.btnDanger}`}
                 onClick={async () => {
                   if (!requestToCancel) return;
                   setCancelling(true);

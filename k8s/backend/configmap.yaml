@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: linkup-backend-config
+data:
+  POSTGRES_HOST: "linkup-db"
+  REDIS_HOST: "linkup-redis"
+  RABBITMQ_HOST: "linkup-rabbitmq"

@@ -23,22 +23,22 @@ EMAIL_MAP = {
         "body": "היי {user_name}, נרשמה נסיעה מ{origin} ל{destination} שיוצאת ב{ride_date}. לחץ/י לצפייה ובקשת הצטרפות."
     },
     "booking_confirmed": {
-        "template": "passaenger/booking_approved.html",
+        "template": "passenger/booking_approved.html",
         "subject": "איזה כיף! הנסיעה שלך אושרה ✅",
         "body": "היי {user_name}, הנהג אישר את בקשתך לנסיעה ל{destination}!"
     },
     "booking_rejected": {
-        "template": "passaenger/booking_rejected.html",
+        "template": "passenger/booking_rejected.html",
         "subject": "עדכון לגבי בקשת הנסיעה שלך ℹ️",
         "body": "היי {user_name}, לצערנו הבקשה לנסיעה ל{destination} לא אושרה."
     },
     "ride_cancelled_by_driver": {
-        "template": "passaenger/ride_cancelled_by_driver.html",
+        "template": "passenger/ride_cancelled_by_driver.html",
         "subject": "עדכון דחוף: הנסיעה בוטלה על ידי הנהג 🛑",
         "body": "הודעה דחופה: הנסיעה ל{destination} בוטלה על ידי הנהג."
     },
     "reminder_passenger": {
-        "template": "passaenger/ride_reminder_passenger.html",
+        "template": "passenger/ride_reminder_passenger.html",
         "subject": "הנסיעה שלך יוצאת בעוד שעה! 🚗",
         "body": "היי {user_name}, תזכורת: הנסיעה שלך ל{destination} יוצאת בעוד שעה."
     },

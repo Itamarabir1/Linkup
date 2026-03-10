@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { api, openChatByBooking } from '../api/client';
 import type { NotificationItem } from '../types/api';
 import { formatDateTimeNoSeconds } from '../utils/date';
-import './AppPages.css';
+import styles from './Notifications.module.css';
 
 export default function Notifications() {
   const { user } = useAuth();
@@ -104,28 +104,28 @@ export default function Notifications() {
 
   if (loading) {
     return (
-      <div className="page">
-        <h1 className="page-title">התראות</h1>
-        <p className="page-loading">טוען...</p>
+      <div className={styles.page}>
+        <h1 className={styles.pageTitle}>התראות</h1>
+        <p className={styles.pageLoading}>טוען...</p>
       </div>
     );
   }
 
   return (
-    <div className="page">
-      <h1 className="page-title">התראות</h1>
+    <div className={styles.page}>
+      <h1 className={styles.pageTitle}>התראות</h1>
       {newNotifications.length > 0 && (
-        <p className="page-meta" style={{ color: '#2563eb', marginBottom: '1rem', fontWeight: 500 }}>
+        <p className={styles.pageMeta} style={{ color: '#2563eb', marginBottom: '1rem', fontWeight: 500 }}>
           יש לך {newNotifications.length} התראות חדשות
         </p>
       )}
-      <p className="page-meta" style={{ color: '#6b7280', marginBottom: '1rem' }}>
+      <p className={styles.pageMeta} style={{ color: '#6b7280', marginBottom: '1rem' }}>
         כל ההתראות שלך: בקשות להצטרפות (כנהג), אישור/דחייה (כנוסע).
       </p>
-      {error && <p className="page-error">{error}</p>}
-      <div className="card-list">
+      {error && <p className={styles.pageError}>{error}</p>}
+      <div className={styles.cardList}>
         {list.length === 0 ? (
-          <p className="empty-text">אין התראות.</p>
+          <p className={styles.emptyText}>אין התראות.</p>
         ) : (
           <>
             {displayedNotifications.map((n) => {
@@ -133,7 +133,7 @@ export default function Notifications() {
               return (
                 <div 
                   key={`${n.booking_id}-${n.created_at}`} 
-                  className="card"
+                  className={styles.card}
                   style={{
                     borderLeft: isNew ? '4px solid #2563eb' : undefined,
                     backgroundColor: isNew ? '#f0f9ff' : undefined,
@@ -149,27 +149,27 @@ export default function Notifications() {
                       חדש
                     </div>
                   )}
-                  <div className="card-route" style={{ fontWeight: 600 }}>
+                  <div className={styles.cardRoute} style={{ fontWeight: 600 }}>
                     {n.title}
                   </div>
                   {n.body && (
-                    <div className="card-meta" style={{ marginTop: '0.25rem' }}>
+                    <div className={styles.cardMeta} style={{ marginTop: '0.25rem' }}>
                       {n.body}
                     </div>
                   )}
                   {(n.ride_origin || n.ride_destination) && (
-                    <div className="card-meta card-route-summary">
+                    <div className={`${styles.cardMeta} ${styles.cardRouteSummary}`}>
                       {n.ride_origin ?? '?'} → {n.ride_destination ?? '?'}
                     </div>
                   )}
-                  <div className="card-meta" style={{ marginTop: '0.25rem', fontSize: '0.9em', color: '#6b7280' }}>
+                  <div className={styles.cardMeta} style={{ marginTop: '0.25rem', fontSize: '0.9em', color: '#6b7280' }}>
                     {formatDateTimeNoSeconds(n.created_at)}
                   </div>
                   {n.type === 'ride_request' && (
-                    <div className="card-actions" style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <div className={styles.cardActions} style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                       <button
                         type="button"
-                        className="btn btn-success"
+                        className={`${styles.btn} ${styles.btnSuccess}`}
                         onClick={() => handleApprove(n.booking_id)}
                         disabled={actionBookingId === n.booking_id}
                       >
@@ -177,7 +177,7 @@ export default function Notifications() {
                       </button>
                       <button
                         type="button"
-                        className="btn btn-outline"
+                        className={`${styles.btn} ${styles.btnOutline}`}
                         onClick={() => handleReject(n.booking_id)}
                         disabled={actionBookingId === n.booking_id}
                       >
@@ -185,7 +185,7 @@ export default function Notifications() {
                       </button>
                       <button
                         type="button"
-                        className="btn btn-outline"
+                        className={`${styles.btn} ${styles.btnOutline}`}
                         onClick={() => handleOpenChat(n.booking_id)}
                         disabled={chatLoading === n.booking_id}
                       >
@@ -199,7 +199,7 @@ export default function Notifications() {
             {list.length > 10 && !showAll && (
               <button
                 type="button"
-                className="btn btn-outline"
+                className={`${styles.btn} ${styles.btnOutline}`}
                 onClick={() => setShowAll(true)}
                 style={{ 
                   marginTop: '1rem', 
@@ -214,7 +214,7 @@ export default function Notifications() {
             {showAll && list.length > 10 && (
               <button
                 type="button"
-                className="btn btn-outline"
+                className={`${styles.btn} ${styles.btnOutline}`}
                 onClick={() => setShowAll(false)}
                 style={{ 
                   marginTop: '1rem', 

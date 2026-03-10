@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import SessionLocal
 from app.domain.chat import crud as chat_crud
-from app.domain.chat.completion_service import handle_conversation_completion
+from app.domain.chat.completion.service import handle_conversation_completion
 
 logger = logging.getLogger(__name__)
 

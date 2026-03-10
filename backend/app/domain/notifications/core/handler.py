@@ -10,7 +10,7 @@ from app.domain.bookings.crud import crud_booking
 from app.domain.passengers.crud import crud_passenger
 
 # Core, Mappings & Schemas
-from app.domain.notifications.config.mappings.index import NOTIFICATION_STRATEGY
+from app.domain.notifications.config.mappings import NOTIFICATION_STRATEGY
 from app.domain.notifications.config.templates_map.email_conf import EMAIL_MAP
 from app.domain.notifications.config.templates_map.push_conf import PUSH_TEMPLATES
 from app.domain.notifications.core.resolver import recipient_resolver

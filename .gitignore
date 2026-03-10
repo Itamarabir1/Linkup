@@ -1,5 +1,6 @@
 # --- Environment & secrets ---
 .env
+**/.env
 .env.*
 !.env.example
 *.pem
@@ -14,6 +15,8 @@
 
 # --- Python (backend, workers) ---
 __pycache__/
+*.pyc
+*.pyo
 *.py[cod]
 *$py.class
 *.so
@@ -45,6 +48,7 @@ htmlcov/
 
 # --- Node (frontend, mobile, etc.) ---
 node_modules/
+.expo/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -59,7 +63,13 @@ pnpm-debug.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# --- Go (chat-ws) ---
+bin/
+*.exe
+
 # --- Build & output ---
+frontend/dist/
+mobile/.expo/
 dist/
 dist-ssr/
 out/
@@ -96,7 +106,8 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # --- Docker (local overrides, keep compose in repo) ---
-# (docker-compose.yml is committed; add here if you add docker-compose.override.yml with secrets)
+# (docker-compose.yml is committed; docker-compose.override.yml is local-only)
+docker-compose.override.yml
 
 # --- Database dumps & local data ---
 *.sql.backup

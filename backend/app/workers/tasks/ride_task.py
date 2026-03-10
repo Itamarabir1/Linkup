@@ -3,7 +3,8 @@ from typing import Dict, Any
 from app.db.session import SessionLocal
 from app.domain.rides.services.maps_service import maps_service
 from app.domain.rides.crud import crud_ride
-from backend.app.infrastructure.events.dispacher.dispatcher import dispatch
+# TODO: dispatch function does not exist — EventDispatcher.dispatch is a method, not a module-level function
+from app.infrastructure.events.dispatcher.dispatcher import dispatch
 from app.core.exceptions import InfrastructureError
 
 logger = logging.getLogger(__name__)

@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.domain.rides.crud import crud_ride
 from app.domain.bookings.crud import crud_booking
 from app.domain.rides.enum import RideStatus
-from app.domain.rides.ride_broadcast import publish_ride_update
+from app.domain.rides.broadcast import publish_ride_update
 
 logger = logging.getLogger(__name__)
 

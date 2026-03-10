@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 class NotificationStreamer:
     """
     אחראי על הזרמת מידע בזמן אמת מהתשתית (Bus) לצינור הפיזי (WebSocket).
-    מבודד את הלוגיקה של ה-WebSocket מהשאלה האם המידע מגיע מ-Redis או Kafka.
+    מבודד את הלוגיקה של ה-WebSocket מהשאלה האם המידע מגיע מ-Redis או ממקור אירועים אחר.
     """
     
     async def stream_user_notifications(self, websocket: WebSocket, user_id: int):

@@ -1,9 +1,0 @@
-Collecting icalendar
-  Downloading icalendar-6.3.2-py3-none-any.whl.metadata (9.0 kB)
-Requirement already satisfied: python-dateutil in c:\users\user\appdata\local\programs\python\python311\lib\site-packages (from icalendar) (2.9.0.post0)
-Requirement already satisfied: tzdata in c:\users\user\appdata\local\programs\python\python311\lib\site-packages (from icalendar) (2025.3)
-Requirement already satisfied: six>=1.5 in c:\users\user\appdata\local\programs\python\python311\lib\site-packages (from python-dateutil->icalendar) (1.17.0)
-Downloading icalendar-6.3.2-py3-none-any.whl (242 kB)
-   -------------------------------------- 242.4/242.4 kB 928.7 kB/s eta 0:00:00
-Installing collected packages: icalendar
-Successfully installed icalendar-6.3.2

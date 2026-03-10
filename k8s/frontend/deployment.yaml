@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: linkup-frontend
+  labels:
+    app: linkup-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: linkup-frontend
+  template:
+    metadata:
+      labels:
+        app: linkup-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: linkup-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"

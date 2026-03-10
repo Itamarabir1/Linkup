@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.env
+.venv/
+*.egg-info/
+celerybeat-schedule
+*.log
+.git/
+tests/
+app/infrastructure/firebase_core/firebase-credentials.json

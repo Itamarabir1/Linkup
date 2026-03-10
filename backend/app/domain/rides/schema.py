@@ -10,7 +10,7 @@ from typing import List, Any, Dict, Optional
 from app.domain.rides.enum import RideStatus
 # שים לב לתיקון הנתיב אם צריך - שמרתי על המקור שלך
 from app.core.utils.validators import validate_future_datetime
-from app.domain.geo.schemas import RouteOptionData
+from app.domain.geo.schema import RouteOptionData
 # --- 0. אובייקטי עזר (Reusable Mixins) ---
 
 class LocationMixin(BaseModel):

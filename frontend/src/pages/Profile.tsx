@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
-import './AppPages.css';
+import styles from './Profile.module.css';
 
 const ACCEPT_AVATAR = 'image/jpeg,image/png,image/webp';
 const MAX_SIZE_MB = 5;
@@ -106,14 +106,14 @@ export default function Profile() {
   }, [user?.avatar_url, uploading]);
 
   return (
-    <div className="page">
-      <h1 className="page-title">פרופיל</h1>
-      {error && <p className="auth-error" style={{ marginBottom: '1rem' }}>{error}</p>}
+    <div className={styles.page}>
+      <h1 className={styles.pageTitle}>פרופיל</h1>
+      {error && <p className={styles.pageError} style={{ marginBottom: '1rem' }}>{error}</p>}
       {user && (
-        <div className="card profile-card">
-          <div className="profile-avatar-block">
+        <div className={`${styles.card} ${styles.profileCard}`}>
+          <div className={styles.profileAvatarBlock}>
             <div
-              className={`profile-avatar-wrap ${hasValidAvatar ? 'profile-avatar-clickable' : ''}`}
+              className={hasValidAvatar ? `${styles.profileAvatarWrap} ${styles.profileAvatarClickable}` : styles.profileAvatarWrap}
               onClick={() => hasValidAvatar && setAvatarExpanded(true)}
               role={hasValidAvatar ? 'button' : undefined}
               aria-label={hasValidAvatar ? 'הצג תמונה בהגדלה' : undefined}
@@ -122,15 +122,15 @@ export default function Profile() {
                 <img 
                   src={avatarSrc} 
                   alt="" 
-                  className="profile-avatar-img"
+                  className={styles.profileAvatarImg}
                   onError={handleAvatarImageError}
                 />
               ) : (
-                <div className="profile-avatar-placeholder">
+                <div className={styles.profileAvatarPlaceholder}>
                   {(user.full_name || user.email || '?').charAt(0).toUpperCase()}
                 </div>
               )}
-              {uploading && <div className="profile-avatar-overlay">מתעדכן...</div>}
+              {uploading && <div className={styles.profileAvatarOverlay}>מתעדכן...</div>}
             </div>
             <input
               ref={fileInputRef}
@@ -140,21 +140,21 @@ export default function Profile() {
               style={{ display: 'none' }}
               disabled={uploading}
             />
-            <div className="profile-avatar-links">
+            <div className={styles.profileAvatarLinks}>
               {hasValidAvatar ? (
                 <>
                   <button
                     type="button"
-                    className="profile-avatar-link"
+                    className={styles.profileAvatarLink}
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading || removing}
                   >
                     {uploading ? 'מעלה...' : 'החלף תמונה'}
                   </button>
-                  <span className="profile-avatar-link-sep">·</span>
+                  <span className={styles.profileAvatarLinkSep}>·</span>
                   <button
                     type="button"
-                    className="profile-avatar-link profile-avatar-link-muted"
+                    className={`${styles.profileAvatarLink} ${styles.profileAvatarLinkMuted}`}
                     onClick={handleRemoveAvatar}
                     disabled={uploading || removing}
                   >
@@ -164,7 +164,7 @@ export default function Profile() {
               ) : (
                 <button
                   type="button"
-                  className="profile-avatar-link"
+                  className={styles.profileAvatarLink}
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
                 >
@@ -174,20 +174,20 @@ export default function Profile() {
             </div>
           </div>
 
-      <div className="profile-row">
-            <span className="profile-label">שם</span>
-            <span className="profile-value">
+      <div className={styles.profileRow}>
+            <span className={styles.profileLabel}>שם</span>
+            <span className={styles.profileValue}>
               {user.full_name || user.first_name || user.email}
             </span>
           </div>
-          <div className="profile-row">
-            <span className="profile-label">אימייל</span>
-            <span className="profile-value">{user.email}</span>
+          <div className={styles.profileRow}>
+            <span className={styles.profileLabel}>אימייל</span>
+            <span className={styles.profileValue}>{user.email}</span>
           </div>
           {user.phone_number && (
-            <div className="profile-row">
-              <span className="profile-label">טלפון</span>
-              <span className="profile-value">{user.phone_number}</span>
+            <div className={styles.profileRow}>
+              <span className={styles.profileLabel}>טלפון</span>
+              <span className={styles.profileValue}>{user.phone_number}</span>
             </div>
           )}
         </div>
@@ -195,7 +195,7 @@ export default function Profile() {
 
       {avatarExpanded && hasValidAvatar && user?.avatar_url && (
         <div
-          className="avatar-modal-backdrop"
+          className={styles.avatarModalBackdrop}
           onClick={() => setAvatarExpanded(false)}
           onKeyDown={(e) => e.key === 'Escape' && setAvatarExpanded(false)}
           role="button"
@@ -204,7 +204,7 @@ export default function Profile() {
         >
           <button
             type="button"
-            className="avatar-modal-close"
+            className={styles.avatarModalClose}
             onClick={() => setAvatarExpanded(false)}
             aria-label="סגור"
           >
@@ -213,7 +213,7 @@ export default function Profile() {
           <img
             src={avatarSrc}
             alt="תמונת פרופיל"
-            className="avatar-modal-img"
+            className={styles.avatarModalImg}
             onClick={(e) => e.stopPropagation()}
             onError={() => {
               setAvatarExpanded(false);
@@ -223,7 +223,7 @@ export default function Profile() {
         </div>
       )}
 
-      <button type="button" className="btn btn-danger" onClick={() => logout()}>
+      <button type="button" className={`${styles.btn} ${styles.btnDanger}`} onClick={() => logout()}>
         התנתק
       </button>
     </div>

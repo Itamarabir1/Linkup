@@ -1,0 +1,17 @@
+# ============================================================
+# Local Development Override — DO NOT COMMIT docker-compose.override.yml
+# Copy this file: cp docker-compose.override.yml.example docker-compose.override.yml
+# docker-compose.override.yml is in .gitignore and should never be committed
+# ============================================================
+
+services:
+  backend:
+    volumes:
+      - ./backend:/app
+    environment:
+      - DEBUG=true
+      - RELOAD=true
+
+  outbox-worker:
+    volumes:
+      - ./backend:/app

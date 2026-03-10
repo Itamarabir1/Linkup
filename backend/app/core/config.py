@@ -26,23 +26,66 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = Field("linkup_app")
     POSTGRES_HOST: str = Field("localhost")
     POSTGRES_PORT: str = Field("5432")
+    # אופציונלי: חיבור מלא ל-Postgres משורת סביבה (למשל מ-Render)
+    DATABASE_URL_RAW: Optional[str] = Field(
+        default=None,
+        description="Optional full database URL (e.g. from Render). If set, overrides pieces above.",
+        env="DATABASE_URL",
+    )
 
     @computed_field
     @property
     def DATABASE_URL(self) -> str:
-        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        """
+        מקור אמת ל-DSN של ה-DB.
+        - לוקאלי / Docker: נבנה מ-POSTGRES_*
+        - פרודקשן (Render): אם DATABASE_URL (RAW) קיים – משתמשים בו ומוודאים asyncpg.
+        """
+        if self.DATABASE_URL_RAW:
+            url = self.DATABASE_URL_RAW
+            # Render מחזיר בד"כ postgresql://user:pass@host:port/db – ממירים ל-postgresql+asyncpg
+            if url.startswith("postgres://"):
+                return "postgresql+asyncpg://" + url[len("postgres://") :]
+            if url.startswith("postgresql://"):
+                return "postgresql+asyncpg://" + url[len("postgresql://") :]
+            return url
+
+        return (
+            f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
+            f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+        )
 
     # --- Redis ---
     REDIS_HOST: str = Field("localhost")
     REDIS_PORT: int = Field(6379)
     REDIS_DB: int = Field(0)
     REDIS_PASSWORD: Optional[str] = Field(None)
+    # Redis DB נפרד לאירועי צ'אט (Pub/Sub completion)
+    REDIS_CHAT_DB: int = Field(1)
+    # אופציונלי: חיבור Redis מלא (למשל מ-Render Key Value)
+    REDIS_URL_RAW: Optional[str] = Field(
+        default=None,
+        description="Optional full Redis URL. If set, overrides REDIS_HOST/PORT/DB/PASSWORD.",
+        env="REDIS_URL",
+    )
 
     @computed_field
     @property
     def REDIS_URL(self) -> str:
+        if self.REDIS_URL_RAW:
+            return self.REDIS_URL_RAW
         auth = f":{self.REDIS_PASSWORD}@" if self.REDIS_PASSWORD else ""
         return f"redis://{auth}{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_DB}"
+
+    @computed_field
+    @property
+    def REDIS_CHAT_URL(self) -> str:
+        """
+        חיבור Redis ייעודי ל-DB של אירועי צ'אט (למשל completion).
+        משתמש באותו host/password אבל עם REDIS_CHAT_DB.
+        """
+        auth = f":{self.REDIS_PASSWORD}@" if self.REDIS_PASSWORD else ""
+        return f"redis://{auth}{self.REDIS_HOST}:{self.REDIS_PORT}/{self.REDIS_CHAT_DB}"
 
     # --- RabbitMQ (Infrastructure & Celery) ---
     RABBITMQ_HOST: str = Field("localhost")
@@ -153,6 +196,7 @@ class Settings(BaseSettings):
     )
 
     FIREBASE_SERVICE_ACCOUNT_PATH: str = Field("", description="Path to Firebase JSON (optional for local dev)")
+    FIREBASE_CREDENTIALS_JSON: Optional[str] = Field(None, description="Firebase credentials as JSON string (production)")
 
     # --- Pydantic Configuration ---
     model_config = SettingsConfigDict(

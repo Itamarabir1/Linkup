@@ -3,7 +3,7 @@ import logging
 from typing import Optional, Dict, List
 from app.infrastructure.geo.client import geo_client 
 from app.services.location.geocoding import GeocodingService
-from app.domain.geo.schemas import GeoLocation, RouteOptionData
+from app.domain.geo.schema import GeoLocation, RouteOptionData
 from app.core.exceptions.validation import InvalidLocationError
 
 logger = logging.getLogger(__name__)

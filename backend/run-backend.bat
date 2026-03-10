@@ -1,4 +1,5 @@
 @echo off
+REM For development only. In production use Docker.
 chcp 65001 >nul
 echo ========================================
 echo   Linkup - הרצת בקאנד (פורט 8000)

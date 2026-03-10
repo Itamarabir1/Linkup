@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import type { RegisterData } from '../context/AuthContext';
 import { API_BASE_URL } from '../config/env';
-import './Auth.css';
+import styles from './Register.module.css';
 
 export default function Register() {
   const [form, setForm] = useState<RegisterData>({
@@ -78,23 +78,23 @@ export default function Register() {
   };
 
   return (
-    <div className="auth-page">
-      <h1 className="auth-title">הרשמה</h1>
-      <form onSubmit={handleSubmit} className="auth-form">
-        {error && <p className="auth-error">{error}</p>}
+    <div className={styles.page}>
+      <h1 className={styles.title}>הרשמה</h1>
+      <form onSubmit={handleSubmit} className={styles.form}>
+        {error && <p className={styles.error}>{error}</p>}
         <input
           type="text"
           placeholder="שם מלא"
           value={form.full_name}
           onChange={(e) => setForm((f) => ({ ...f, full_name: e.target.value }))}
-          className="auth-input"
+          className={styles.input}
         />
         <input
           type="email"
           placeholder="אימייל"
           value={form.email}
           onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-          className="auth-input"
+          className={styles.input}
           autoComplete="email"
         />
         <input
@@ -104,14 +104,14 @@ export default function Register() {
           onChange={(e) =>
             setForm((f) => ({ ...f, phone_number: e.target.value }))
           }
-          className="auth-input"
+          className={styles.input}
         />
         <input
           type="password"
           placeholder="סיסמה: 8+ תווים, A-Z, a-z, 0-9, תו מיוחד (@$!%*?&)"
           value={form.password}
           onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-          className="auth-input"
+          className={styles.input}
           autoComplete="new-password"
         />
         <input
@@ -121,14 +121,14 @@ export default function Register() {
           onChange={(e) =>
             setForm((f) => ({ ...f, confirm_password: e.target.value }))
           }
-          className="auth-input"
+          className={styles.input}
           autoComplete="new-password"
         />
-        <button type="submit" className="auth-button" disabled={loading}>
+        <button type="submit" className={styles.button} disabled={loading}>
           {loading ? 'נרשם...' : 'הירשם'}
         </button>
       </form>
-      <p className="auth-link">
+      <p className={styles.link}>
         <Link to="/login">כבר יש חשבון? התחבר</Link>
       </p>
       <p style={{ fontSize: 11, color: '#888', marginTop: 24, direction: 'ltr', textAlign: 'center' }}>

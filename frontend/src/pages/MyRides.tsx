@@ -5,7 +5,7 @@ import type { Ride } from '../types/api';
 import { formatDateTimeNoSeconds } from '../utils/date';
 import { API_BASE_URL } from '../config/env';
 import { useAuth } from '../context/AuthContext';
-import './AppPages.css';
+import styles from './MyRides.module.css';
 
 function getRideWsUrl(rideId: number): string {
   const base = API_BASE_URL.startsWith('http')
@@ -118,45 +118,45 @@ export default function MyRides() {
 
   if (loading) {
     return (
-      <div className="page">
-        <div className="page-loading">טוען...</div>
+      <div className={styles.page}>
+        <div className={styles.pageLoading}>טוען...</div>
       </div>
     );
   }
 
   return (
-    <div className="page">
-      <header className="page-header">
-        <h1 className="page-title">הנסיעות שלי</h1>
-        <Link to="/create-ride" className="btn btn-primary">
+    <div className={styles.page}>
+      <header className={styles.pageHeader}>
+        <h1 className={styles.pageTitle}>הנסיעות שלי</h1>
+        <Link to="/create-ride" className={`${styles.btn} ${styles.btnPrimary}`}>
           + נסיעה חדשה
         </Link>
       </header>
-      {error && <p className="page-error">{error}</p>}
-      <div className="card-list">
+      {error && <p className={styles.pageError}>{error}</p>}
+      <div className={styles.cardList}>
         {rides.length === 0 ? (
-          <p className="empty-text">אין נסיעות. צור נסיעה חדשה.</p>
+          <p className={styles.emptyText}>אין נסיעות. צור נסיעה חדשה.</p>
         ) : (
           rides.map((r) => (
-            <div key={r.ride_id} className="card card-ride card-ride-wrap">
+            <div key={r.ride_id} className={`${styles.card} ${styles.cardRideWrap}`}>
               <button
                 type="button"
-                className="card-ride-delete-btn"
+                className={styles.cardRideDeleteBtn}
                 onClick={() => setRideToCancel(r.ride_id)}
                 title="מחק נסיעה"
                 aria-label="מחק נסיעה"
               >
                 ×
               </button>
-              <div className="card-route">
+              <div className={styles.cardRoute}>
                 {r.origin_name ?? '?'} → {r.destination_name ?? '?'}
               </div>
-              <div className="card-meta">
+              <div className={styles.cardMeta}>
                 {formatDateTimeNoSeconds(r.departure_time)} ·{' '}
                 {r.available_seats} מושבים · {r.status}
               </div>
               {r.route_summary && (
-                <div className="card-meta card-route-summary">
+                <div className={`${styles.cardMeta} ${styles.cardRouteSummary}`}>
                   כביש מרכזי: {r.route_summary}
                 </div>
               )}
@@ -167,23 +167,23 @@ export default function MyRides() {
 
       {rideToCancel != null && (
         <div
-          className="confirm-modal-backdrop"
+          className={styles.confirmModalBackdrop}
           role="dialog"
           aria-modal="true"
           aria-labelledby="confirm-delete-title"
           onClick={() => setRideToCancel(null)}
         >
           <div
-            className="confirm-modal-box"
+            className={styles.confirmModalBox}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="confirm-delete-title" className="confirm-modal-title">
+            <h2 id="confirm-delete-title" className={styles.confirmModalTitle}>
               האם אני בטוח שאני רוצה למחוק את המסלול?
             </h2>
-            <div className="confirm-modal-actions">
+            <div className={styles.confirmModalActions}>
               <button
                 type="button"
-                className="btn btn-outline"
+                className={`${styles.btn} ${styles.btnOutline}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   setRideToCancel(null);
@@ -194,7 +194,7 @@ export default function MyRides() {
               </button>
               <button
                 type="button"
-                className="btn btn-danger"
+                className={`${styles.btn} ${styles.btnDanger}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   handleConfirmCancel();

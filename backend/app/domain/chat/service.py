@@ -210,12 +210,12 @@ async def send_message(
 ) -> MessageResponse | None:
     """
     שולח הודעה בשיחה: שמירה ב-DB + פרסום ל-Redis (שרת ה-WS ב-Go מאזין).
-    אם ההודעה היא הודעת סיום - מטפל בניתוח AI ושליחת event.
+    אם ההודעה היא הודעת סיום — מפרסם אירוע ל-Redis DB=1; worker יטפל בניתוח AI.
     מחזיר MessageResponse אם המשתמש participant והשיחה קיימת.
     """
-    from app.domain.chat.completion_detector import is_conversation_completion_message
-    from app.domain.chat.completion_service import handle_conversation_completion
-    
+    from app.domain.chat.completion.detector import is_conversation_completion_message
+    from app.infrastructure.redis.chat_completion_publish import publish_chat_completion_event
+
     conv = await chat_crud.get_conversation_by_id(
         db, conversation_id, sender_id
     )
@@ -235,14 +235,13 @@ async def send_message(
     }
     await publish_chat_message(conversation_id, payload)
     
-    # בדיקה אם זו הודעת סיום
+    # בדיקה אם זו הודעת סיום — מפרסם ל-Redis DB=1; worker יטפל בניתוח AI
     if is_conversation_completion_message(body):
-        # טיפול בסיום שיחה (ניתוח AI + event) - רץ ברקע, לא חוסם את התשובה
         try:
-            await handle_conversation_completion(db, conversation_id, sender_id)
+            await publish_chat_completion_event(conversation_id, sender_id)
         except Exception as e:
-            logger.error(f"Error handling conversation completion: {e}", exc_info=True)
-    
+            logger.error("Error publishing chat completion event: %s", e, exc_info=True)
+
     return MessageResponse(
         message_id=msg.message_id,
         conversation_id=msg.conversation_id,

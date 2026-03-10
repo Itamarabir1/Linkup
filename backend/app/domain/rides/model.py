@@ -7,7 +7,7 @@ from geoalchemy2 import Geography
 
 from app.db.base import Base
 from app.domain.rides.enum import RideStatus
-from app.domain.geo.models.utils import convert_db_route_to_list
+from app.domain.geo.utils import convert_db_route_to_list
 
 
 def _ride_status_from_db(value):

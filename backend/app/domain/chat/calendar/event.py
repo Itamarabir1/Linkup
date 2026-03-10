@@ -6,7 +6,7 @@ from typing import Optional
 
 from icalendar import Event
 
-from ..schema_ai import RideSummary
+from ..ai.schema import RideSummary
 from .time_parser import parse_hebrew_time
 
 
@@ -53,6 +53,6 @@ def create_calendar_event(ride: RideSummary, base_date: Optional[datetime] = Non
     event.add('dtstamp', datetime.now())
     
     # מזהה ייחודי לאירוע
-    event.add('uid', f'trempflow-{ride.driver_name}-{ride.passenger_name}-{meeting_datetime.isoformat()}')
+    event.add('uid', f'linkup-{ride.driver_name}-{ride.passenger_name}-{meeting_datetime.isoformat()}')
     
     return event

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../api/client';
-import './Auth.css';
+import styles from './VerifyEmail.module.css';
 
 export default function VerifyEmail() {
   const location = useLocation();
@@ -18,10 +18,10 @@ export default function VerifyEmail() {
 
   if (!email) {
     return (
-      <div className="auth-page">
-        <h1 className="auth-title">אימות חשבון מייל</h1>
-        <p className="auth-error">לא נמצא אימייל לאימות. נא להירשם או להיכנס מחדש.</p>
-        <p className="auth-link">
+      <div className={styles.page}>
+        <h1 className={styles.title}>אימות חשבון מייל</h1>
+        <p className={styles.error}>לא נמצא אימייל לאימות. נא להירשם או להיכנס מחדש.</p>
+        <p className={styles.link}>
           <Link to="/register">הרשמה</Link> · <Link to="/login">התחברות</Link>
         </p>
       </div>
@@ -82,13 +82,13 @@ export default function VerifyEmail() {
   };
 
   return (
-    <div className="auth-page">
-      <h1 className="auth-title">אימות חשבון מייל</h1>
+    <div className={styles.page}>
+      <h1 className={styles.title}>אימות חשבון מייל</h1>
       <p style={{ marginBottom: '1rem', color: '#374151' }}>
         נשלח קוד אימות ל־<strong>{email}</strong>. הזן את הקוד למטה.
       </p>
-      <form onSubmit={handleVerify} className="auth-form">
-        {error && <p className="auth-error">{error}</p>}
+      <form onSubmit={handleVerify} className={styles.form}>
+        {error && <p className={styles.error}>{error}</p>}
         {success && <p style={{ color: '#059669', margin: 0 }}>{success}</p>}
         <input
           type="text"
@@ -97,14 +97,14 @@ export default function VerifyEmail() {
           placeholder="קוד אימות (6 ספרות)"
           value={code}
           onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-          className="auth-input"
+          className={styles.input}
           maxLength={6}
         />
-        <button type="submit" className="auth-button" disabled={loading}>
+        <button type="submit" className={styles.button} disabled={loading}>
           {loading ? 'מאמת...' : 'אמת חשבון'}
         </button>
       </form>
-      <p className="auth-link" style={{ marginTop: '1rem' }}>
+      <p className={styles.link} style={{ marginTop: '1rem' }}>
         <button
           type="button"
           onClick={handleResend}
@@ -121,7 +121,7 @@ export default function VerifyEmail() {
           {resendLoading ? 'שולח...' : 'שלח קוד שוב'}
         </button>
       </p>
-      <p className="auth-link">
+      <p className={styles.link}>
         <Link to="/login">חזרה להתחברות</Link>
       </p>
     </div>

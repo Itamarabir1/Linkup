@@ -216,7 +216,7 @@ async def export_conversation_calendar(
     """
     from app.domain.chat.calendar_export import get_conversation_for_calendar_export
     from app.domain.chat.calendar.exporter import export_rides_to_ical_bytes
-    from app.domain.chat.schema_ai import RideSummary
+    from app.domain.chat.ai.schema import RideSummary
     from datetime import datetime
     
     # איסוף נתוני שיחה

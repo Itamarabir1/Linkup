@@ -29,23 +29,14 @@
 
 ## AI Analysis - איפה?
 
-### אופציה מומלצת: Service נפרד + API endpoint
-
-**AI Analyzer Service** (Python, ב-`chat-ws/ai/service/`):
-- מאזין ל-Redis (`chat:conversation:*`)
-- מנתח כל הודעה (async, לא חוסם)
-- שומר תוצאות ב-DB או Redis cache
-- מפרסם תוצאות ל-Redis (`chat:analysis:{conversation_id}`)
+**ניתוח AI רץ ב-backend worker (outbox-worker):**
+- Backend מפרסם אירוע סיום שיחה ל-Redis DB 1 (`chat:completion:{conversation_id}`).
+- ה-outbox-worker מאזין ל-Redis DB 1, מפעיל `handle_conversation_completion` (domain/chat/ai), שומר ל-DB ושולח ל-outbox.
 
 **API Endpoint** (ב-backend):
 - `GET /api/v1/chat/conversations/{id}/analysis`
-- קורא תוצאות מ-DB/Redis
+- קורא תוצאות מ-DB
 - מחזיר למשתמש
-
-**יתרונות:**
-- ✅ לא חוסם את ה-API (ניתוח יכול לקחת זמן)
-- ✅ יכול לסקייל בנפרד
-- ✅ API endpoint נגיש למשתמשים
 
 ## Calendar Export - איפה?
 
@@ -61,7 +52,7 @@
 **מיקום קוד:**
 - ✅ `backend/app/domain/chat/calendar/` - לוגיקת calendar (נדרש)
 - ✅ `backend/app/api/v1/routers/chat.py` - endpoint
-- ❌ `chat-ws/ai/calendar/` - **לא נדרש** (ה-AI service לא משתמש בו)
+- ❌ אין שירות AI נפרד; ניתוח רץ ב-backend worker
 
 **למה לא ב-chat-ws?**
 - ה-AI Analyzer Service לא צריך לייצא ללוח שנה
@@ -77,7 +68,8 @@ Client → POST /api/v1/chat/conversations/{id}/messages (backend)
        → Backend שומר ב-DB
        → Backend מפרסם ל-Redis (chat:conversation:{id})
        → chat-ws מקבל מ-Redis → שולח ל-WebSocket
-       → AI Analyzer מקבל מ-Redis → מנתח → שומר תוצאה
+       → אם הודעת סיום: Backend מפרסם ל-Redis DB 1 (chat:completion:{id})
+       → outbox-worker מאזין → מנתח (AI) → שומר תוצאה + outbox
 ```
 
 ### 2. קבלת ניתוח AI
@@ -103,6 +95,6 @@ Client → GET /api/v1/chat/conversations/{id}/calendar.ics (backend)
 | WebSocket connections | chat-ws (Go) | Real-time, performance |
 | REST API endpoints | backend (Python) | Standard API pattern |
 | Calendar export | backend (Python) | API endpoint |
-| AI analysis service | chat-ws/ai/service (Python) | Async, לא חוסם |
+| AI analysis | backend worker (outbox-worker) | Async, Redis DB 1 listener |
 | AI analysis results API | backend (Python) | API endpoint |
 | Business logic | backend (Python) | Centralized |

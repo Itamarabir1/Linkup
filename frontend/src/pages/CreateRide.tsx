@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import type { RidePreviewResponse } from '../types/api';
 import { formatDurationMinutes } from '../utils/duration';
 import RouteMapModal, { type RouteMapData } from '../components/RouteMapModal';
-import './AppPages.css';
+import styles from './CreateRide.module.css';
 
 export default function CreateRide() {
   const { user } = useAuth();
@@ -129,24 +129,24 @@ export default function CreateRide() {
   };
 
   return (
-    <div className="page">
-      <h1 className="page-title">הצע נסיעה</h1>
-      <p className="page-meta" style={{ color: '#6b7280', marginBottom: '1rem' }}>
+    <div className={styles.page}>
+      <h1 className={styles.pageTitle}>הצע נסיעה</h1>
+      <p className={styles.pageMeta} style={{ color: '#6b7280', marginBottom: '1rem' }}>
         מוצא, יעד, זמן יציאה, מושבים ומחיר – כמו בבקאנד.
       </p>
-      <form onSubmit={requestPreview} className="form-block">
-        {error && <p className="page-error">{error}</p>}
-        <div className="form-row-with-btn">
+      <form onSubmit={requestPreview} className={styles.formBlock}>
+        {error && <p className={styles.pageError}>{error}</p>}
+        <div className={styles.formRowWithBtn}>
           <input
             type="text"
             placeholder="מוצא (כתובת)"
             value={originName}
             onChange={(e) => setOriginName(e.target.value)}
-            className="form-input"
+            className={styles.formInput}
           />
           <button
             type="button"
-            className="btn btn-outline"
+            className={`${styles.btn} ${styles.btnOutline}`}
             onClick={fillOriginFromMyLocation}
             disabled={locationLoading}
           >
@@ -158,42 +158,42 @@ export default function CreateRide() {
           placeholder="יעד (כתובת)"
           value={destinationName}
           onChange={(e) => setDestinationName(e.target.value)}
-          className="form-input"
+          className={styles.formInput}
         />
-        <label className="form-label">תאריך יציאה</label>
+        <label className={styles.formLabel}>תאריך יציאה</label>
         <input
           type="date"
           value={departureDate}
           onChange={(e) => setDepartureDate(e.target.value)}
-          className="form-input"
+          className={styles.formInput}
         />
-        <label className="form-label">שעת יציאה</label>
+        <label className={styles.formLabel}>שעת יציאה</label>
         <input
           type="time"
           value={departureTime}
           onChange={(e) => setDepartureTime(e.target.value)}
-          className="form-input"
+          className={styles.formInput}
         />
-        <label className="form-label">מספר מושבים</label>
+        <label className={styles.formLabel}>מספר מושבים</label>
         <input
           type="number"
           min={1}
           value={seats}
           onChange={(e) => setSeats(e.target.value)}
-          className="form-input"
+          className={styles.formInput}
         />
-        <label className="form-label">מחיר (₪)</label>
+        <label className={styles.formLabel}>מחיר (₪)</label>
         <input
           type="number"
           min={0}
           step={0.01}
           value={price}
           onChange={(e) => setPrice(e.target.value)}
-          className="form-input"
+          className={styles.formInput}
         />
         <button
           type="submit"
-          className="btn btn-primary"
+          className={`${styles.btn} ${styles.btnPrimary}`}
           disabled={loading}
         >
           {loading ? 'טוען...' : 'תצוגה מקדימה'}
@@ -201,21 +201,21 @@ export default function CreateRide() {
       </form>
 
       {preview && (preview.routes?.length ?? 0) === 0 && (
-        <p className="empty-text" style={{ marginTop: '1rem' }}>לא נמצאו מסלולים. נסה מוצא/יעד אחרים.</p>
+        <p className={styles.emptyText} style={{ marginTop: '1rem' }}>לא נמצאו מסלולים. נסה מוצא/יעד אחרים.</p>
       )}
       {preview && (preview.routes?.length ?? 0) > 0 && (
-        <div className="preview-card">
-          <h2 className="page-subtitle">בחר מסלול</h2>
-          <p className="page-meta" style={{ marginBottom: '1rem' }}>
+        <div className={styles.previewCard}>
+          <h2 className={styles.pageSubtitle}>בחר מסלול</h2>
+          <p className={styles.pageMeta} style={{ marginBottom: '1rem' }}>
             גוגל מפות מחזיר עד 3 מסלולים – בחר את המסלול הרצוי.
           </p>
-          <div className="route-options">
+          <div className={styles.routeOptions}>
             {(preview.routes ?? []).map((route) => (
               <div
                 key={route.route_index}
                 role="button"
                 tabIndex={0}
-                className={`card route-option ${selectedRouteIndex >= 0 && selectedRouteIndex === route.route_index ? 'route-option-selected' : ''}`}
+                className={`${styles.card} ${styles.routeOption} ${selectedRouteIndex >= 0 && selectedRouteIndex === route.route_index ? styles.routeOptionSelected : ''}`}
                 onClick={() => setSelectedRouteIndex(route.route_index)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
@@ -224,17 +224,17 @@ export default function CreateRide() {
                   }
                 }}
               >
-                <div className="route-option-content">
-                  <div className="card-route">
+                <div className={styles.routeOptionContent}>
+                  <div className={styles.cardRoute}>
                     מסלול {route.route_index + 1}: {route.summary || '—'}
                   </div>
-                  <div className="card-meta">
+                  <div className={styles.cardMeta}>
                     {route.distance_km ?? 0} ק"מ · {formatDurationMinutes(route.duration_min ?? 0)}
                   </div>
                 </div>
                 <button
                   type="button"
-                  className="btn btn-route-map"
+                  className={`${styles.btn} ${styles.btnRouteMap}`}
                   onClick={(e) => {
                     e.stopPropagation();
                     setMapPreviewData({
@@ -253,7 +253,7 @@ export default function CreateRide() {
           <RouteMapModal data={mapPreviewData} onClose={() => setMapPreviewData(null)} />
           <button
             type="button"
-            className="btn btn-success"
+            className={`${styles.btn} ${styles.btnSuccess}`}
             onClick={createRide}
             disabled={creating}
           >

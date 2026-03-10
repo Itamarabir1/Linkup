@@ -1,0 +1,156 @@
+.page {
+  padding: 1rem 1.5rem;
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: right;
+}
+
+.pageTitle {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.pageMeta {
+  color: #6b7280;
+  margin-bottom: 1rem;
+}
+
+.pageTabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.pageError {
+  color: #dc2626;
+  margin-bottom: 1rem;
+}
+
+.pageLoading,
+.emptyText {
+  text-align: center;
+  color: #6b7280;
+  padding: 2rem;
+}
+
+.cardList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.card {
+  background: #fff;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  border-right: 4px solid #2563eb;
+}
+
+.cardRide {
+  /* same as card, ride variant */
+}
+
+.cardRideWrap {
+  position: relative;
+}
+
+.cardRoute {
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.cardMeta {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+.cardRouteSummary {
+  font-style: italic;
+  color: #4b5563;
+}
+
+.btn {
+  display: inline-block;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  text-align: center;
+}
+
+.btnPrimary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.btnPrimary:hover {
+  background: #1d4ed8;
+}
+
+.btnOutline {
+  background: transparent;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.btnOutline:hover {
+  background: #f3f4f6;
+}
+
+.btnDanger {
+  background: #dc2626;
+  color: #fff;
+  margin-top: 1rem;
+}
+
+.btnDanger:hover {
+  background: #b91c1c;
+}
+
+.confirmModalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.confirmModalBox {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  max-width: 360px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+.confirmModalTitle {
+  font-size: 1.1rem;
+  margin: 0 0 1rem 0;
+  color: #111;
+}
+
+.confirmModalActions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1.25rem;
+}
+
+.confirmModalActions .btn {
+  width: 120px;
+  min-width: 120px;
+  padding: 0.6rem 1rem;
+  margin: 0;
+  box-sizing: border-box;
+}

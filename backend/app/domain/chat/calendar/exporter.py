@@ -4,8 +4,8 @@
 from datetime import datetime
 from typing import List, Optional
 
-from ..schema_ai import RideSummary
-from .calendar import create_calendar_from_rides
+from ..ai.schema import RideSummary
+from .builder import create_calendar_from_rides
 
 
 def export_to_ical(rides: List[RideSummary], output_path: str, base_date: Optional[datetime] = None) -> bool:
@@ -43,6 +43,30 @@ def export_rides_to_ical_bytes(rides: List[RideSummary], base_date: Optional[dat
     Returns:
         bytes של קובץ iCal
     """
-    from .calendar import create_calendar_from_rides
+    from .builder import create_calendar_from_rides
     cal = create_calendar_from_rides(rides, base_date)
     return cal.to_ical()
+
+
+def export_batch_to_ical(
+    rides_groups: List[List[RideSummary]],
+    output_paths: List[str],
+    base_date: Optional[datetime] = None,
+) -> List[bool]:
+    """
+    מייצא מספר קבוצות של טרמפים לקבצי iCal נפרדים.
+
+    Args:
+        rides_groups: רשימת קבוצות טרמפים
+        output_paths: רשימת נתיבים לקבצי פלט (חייב להיות אותו אורך)
+        base_date: תאריך בסיס לחישוב תאריכים
+
+    Returns:
+        רשימת bool — True לכל קובץ שיוצא בהצלחה
+    """
+    if len(rides_groups) != len(output_paths):
+        raise ValueError("rides_groups and output_paths must have the same length")
+    return [
+        export_to_ical(rides, path, base_date)
+        for rides, path in zip(rides_groups, output_paths)
+    ]

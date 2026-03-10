@@ -3,7 +3,7 @@ from typing import Optional, Dict, List
 from datetime import datetime, timedelta
 
 from app.infrastructure.geo.client import geo_client
-from app.domain.geo.schemas import GeoLocation, RouteOptionData
+from app.domain.geo.schema import GeoLocation, RouteOptionData
 
 logger = logging.getLogger(__name__)
 

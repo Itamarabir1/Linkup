@@ -13,7 +13,7 @@ from app.core.exceptions.validation import SameOriginDestinationError
 from app.core.exceptions.infrastructure import RouteNotFoundError
 
 from app.infrastructure.redis.broadcast import broadcast
-from app.domain.rides.ride_repository import ride_cache_repo, RideCacheRepository
+from app.domain.rides.repository import ride_cache_repo, RideCacheRepository
 from app.domain.rides.model import Ride
 from app.domain.rides.crud import crud_ride
 from app.domain.rides.mapper import RideMapper
@@ -25,7 +25,7 @@ from app.domain.rides.schema import (
     RideUpdate,
 )
 from app.domain.rides.enum import RideStatus, RideBroadcastAction
-from app.domain.rides.ride_broadcast import (
+from app.domain.rides.broadcast import (
     RideNotificationFactory,
     RIDES_LIST_CHANNEL,
     publish_ride_update,

@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { api, openChatByBooking } from '../api/client';
 import type { Ride } from '../types/api';
 import { formatDateTimeNoSeconds } from '../utils/date';
-import './AppPages.css';
+import styles from './MyBookings.module.css';
 
 interface BookingRow {
   booking_id: number;
@@ -189,18 +189,18 @@ export default function MyBookings() {
   };
 
   return (
-    <div className="page">
-      <h1 className="page-title">הזמנות שלי</h1>
-      <p className="page-meta" style={{ color: '#6b7280', marginBottom: '1rem' }}>
+    <div className={styles.page}>
+      <h1 className={styles.pageTitle}>הזמנות שלי</h1>
+      <p className={styles.pageMeta} style={{ color: '#6b7280', marginBottom: '1rem' }}>
         כל הבוקינגים – נסיעות שאישרת (כנהג) או שאושרו לך (כנוסע).
       </p>
 
-      <div role="tablist" className="page-tabs" style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+      <div role="tablist" className={styles.pageTabs}>
         <button
           type="button"
           role="tab"
           aria-selected={activeTab === 'passenger'}
-          className={activeTab === 'passenger' ? 'btn btn-primary' : 'btn btn-outline'}
+          className={activeTab === 'passenger' ? `${styles.btn} ${styles.btnPrimary}` : `${styles.btn} ${styles.btnOutline}`}
           onClick={() => setActiveTab('passenger')}
         >
           נוסע
@@ -209,37 +209,37 @@ export default function MyBookings() {
           type="button"
           role="tab"
           aria-selected={activeTab === 'driver'}
-          className={activeTab === 'driver' ? 'btn btn-primary' : 'btn btn-outline'}
+          className={activeTab === 'driver' ? `${styles.btn} ${styles.btnPrimary}` : `${styles.btn} ${styles.btnOutline}`}
           onClick={() => setActiveTab('driver')}
         >
           נהג
         </button>
       </div>
 
-      {error && <p className="page-error">{error}</p>}
+      {error && <p className={styles.pageError}>{error}</p>}
 
       {activeTab === 'passenger' && (
-        <div className="card-list">
+        <div className={styles.cardList}>
           {passengerLoading ? (
-            <p className="page-loading">טוען...</p>
+            <p className={styles.pageLoading}>טוען...</p>
           ) : passengerList.length === 0 ? (
-            <p className="empty-text">אין הזמנות כנוסע. חפש טרמפ ובקש להצטרף.</p>
+            <p className={styles.emptyText}>אין הזמנות כנוסע. חפש טרמפ ובקש להצטרף.</p>
           ) : (
             passengerList.map(({ ride, bookingId, bookingStatus, driverName }) => (
-              <div key={bookingId} className="card card-ride card-ride-wrap">
-                <div className="card-route">
+              <div key={bookingId} className={`${styles.card} ${styles.cardRide} ${styles.cardRideWrap}`}>
+                <div className={styles.cardRoute}>
                   {ride.origin_name ?? '?'} → {ride.destination_name ?? '?'}
                 </div>
-                <div className="card-meta">
+                <div className={styles.cardMeta}>
                   {formatDateTimeNoSeconds(ride.departure_time)} · {ride.available_seats} מושבים ·{' '}
                   {statusLabel[bookingStatus] ?? bookingStatus}
                 </div>
-                {driverName && <div className="card-meta">נהג: {driverName}</div>}
+                {driverName && <div className={styles.cardMeta}>נהג: {driverName}</div>}
                 {(bookingStatus === 'pending_approval' || bookingStatus === 'confirmed') && (
                   <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #e5e7eb', display: 'grid', gap: '0.5rem' }}>
                     <button
                       type="button"
-                      className="btn btn-outline"
+                      className={`${styles.btn} ${styles.btnOutline}`}
                       onClick={() => handleOpenChat(bookingId)}
                       disabled={chatLoading === bookingId}
                       style={{ width: '100%' }}
@@ -248,7 +248,7 @@ export default function MyBookings() {
                     </button>
                     <button
                       type="button"
-                      className="btn btn-danger"
+                      className={`${styles.btn} ${styles.btnDanger}`}
                       onClick={() => setBookingToCancel(bookingId)}
                       disabled={cancelling}
                       style={{ width: '100%' }}
@@ -264,23 +264,23 @@ export default function MyBookings() {
       )}
 
       {activeTab === 'driver' && (
-        <div className="card-list">
+        <div className={styles.cardList}>
           {driverLoading ? (
-            <p className="page-loading">טוען...</p>
+            <p className={styles.pageLoading}>טוען...</p>
           ) : driverList.length === 0 ? (
-            <p className="empty-text">אין הזמנות שאישרת. נוסעים שאישרת יופיעו כאן.</p>
+            <p className={styles.emptyText}>אין הזמנות שאישרת. נוסעים שאישרת יופיעו כאן.</p>
           ) : (
             driverList.map(({ ride, passengers }) => (
-              <div key={ride.ride_id} className="card card-ride card-ride-wrap">
+              <div key={ride.ride_id} className={`${styles.card} ${styles.cardRide} ${styles.cardRideWrap}`}>
                 {/* פרטי הנסיעה - פעם אחת */}
-                <div className="card-route">
+                <div className={styles.cardRoute}>
                   {ride.origin_name ?? '?'} → {ride.destination_name ?? '?'}
                 </div>
-                <div className="card-meta">
+                <div className={styles.cardMeta}>
                   {formatDateTimeNoSeconds(ride.departure_time)} · {ride.available_seats} מושבים
                 </div>
                 {ride.route_summary && (
-                  <div className="card-meta card-route-summary">
+                  <div className={`${styles.cardMeta} ${styles.cardRouteSummary}`}>
                     כביש מרכזי: {ride.route_summary}
                   </div>
                 )}
@@ -324,7 +324,7 @@ export default function MyBookings() {
                           <div style={{ display: 'flex', gap: '0.5rem' }}>
                             <button
                               type="button"
-                              className="btn btn-outline"
+                              className={`${styles.btn} ${styles.btnOutline}`}
                               onClick={() => setSelectedPassenger(passenger)}
                               style={{ fontSize: '0.875rem', padding: '0.375rem 0.75rem' }}
                             >
@@ -332,7 +332,7 @@ export default function MyBookings() {
                             </button>
                             <button
                               type="button"
-                              className="btn btn-outline"
+                              className={`${styles.btn} ${styles.btnOutline}`}
                               onClick={() => handleOpenChat(passenger.bookingId)}
                               disabled={chatLoading === passenger.bookingId}
                               style={{ fontSize: '0.875rem', padding: '0.375rem 0.75rem' }}
@@ -353,23 +353,23 @@ export default function MyBookings() {
 
       {bookingToCancel != null && (
         <div
-          className="confirm-modal-backdrop"
+          className={styles.confirmModalBackdrop}
           role="dialog"
           aria-modal="true"
           aria-labelledby="confirm-cancel-booking-title"
           onClick={() => (!cancelling ? setBookingToCancel(null) : null)}
         >
           <div
-            className="confirm-modal-box"
+            className={styles.confirmModalBox}
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="confirm-cancel-booking-title" className="confirm-modal-title">
+            <h2 id="confirm-cancel-booking-title" className={styles.confirmModalTitle}>
               האם אתה בטוח שאתה רוצה לבטל את ההזמנה הזו?
             </h2>
-            <div className="confirm-modal-actions">
+            <div className={styles.confirmModalActions}>
               <button
                 type="button"
-                className="btn btn-outline"
+                className={`${styles.btn} ${styles.btnOutline}`}
                 onClick={() => setBookingToCancel(null)}
                 disabled={cancelling}
               >
@@ -377,7 +377,7 @@ export default function MyBookings() {
               </button>
               <button
                 type="button"
-                className="btn btn-danger"
+                className={`${styles.btn} ${styles.btnDanger}`}
                 onClick={async () => {
                   if (bookingToCancel == null) return;
                   setCancelling(true);
@@ -406,18 +406,18 @@ export default function MyBookings() {
 
       {selectedPassenger && (
         <div
-          className="confirm-modal-backdrop"
+          className={styles.confirmModalBackdrop}
           role="dialog"
           aria-modal="true"
           aria-labelledby="passenger-details-title"
           onClick={() => setSelectedPassenger(null)}
         >
           <div
-            className="confirm-modal-box"
+            className={styles.confirmModalBox}
             onClick={(e) => e.stopPropagation()}
             style={{ maxWidth: '500px' }}
           >
-            <h2 id="passenger-details-title" className="confirm-modal-title">
+            <h2 id="passenger-details-title" className={styles.confirmModalTitle}>
               פרטי נוסע
             </h2>
             <div style={{ padding: '1rem 0' }}>
@@ -448,10 +448,10 @@ export default function MyBookings() {
                 </div>
               </div>
             </div>
-            <div className="confirm-modal-actions">
+            <div className={styles.confirmModalActions}>
               <button
                 type="button"
-                className="btn btn-primary"
+                className={`${styles.btn} ${styles.btnPrimary}`}
                 onClick={(e) => {
                   e.stopPropagation();
                   setSelectedPassenger(null);

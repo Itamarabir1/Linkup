@@ -2,8 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import GoogleSignIn from '../components/GoogleSignIn';
-import GoogleSignInDebug from '../components/GoogleSignInDebug';
-import './Auth.css';
+import styles from './Login.module.css';
 
 export default function Login() {
   const location = useLocation();
@@ -53,20 +52,19 @@ export default function Login() {
   };
 
   return (
-    <div className="auth-page">
-      <GoogleSignInDebug />
-      <h1 className="auth-title">התחברות</h1>
+    <div className={styles.page}>
+      <h1 className={styles.title}>התחברות</h1>
       {verifiedMessage && (
         <p style={{ color: '#059669', marginBottom: '1rem' }}>החשבון אומת. התחבר כעת.</p>
       )}
-      <form onSubmit={handleLogin} className="auth-form">
-        {error && <p className="auth-error">{error}</p>}
+      <form onSubmit={handleLogin} className={styles.form}>
+        {error && <p className={styles.error}>{error}</p>}
         <input
           type="email"
           placeholder="אימייל"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="auth-input"
+          className={styles.input}
           autoComplete="email"
         />
         <input
@@ -74,10 +72,10 @@ export default function Login() {
           placeholder="סיסמה"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="auth-input"
+          className={styles.input}
           autoComplete="current-password"
         />
-        <button type="submit" className="auth-button" disabled={loading}>
+        <button type="submit" className={styles.button} disabled={loading}>
           {loading ? 'מתחבר...' : 'התחבר'}
         </button>
       </form>
@@ -104,7 +102,7 @@ export default function Login() {
 
       <GoogleSignIn onError={setError} disabled={loading} />
 
-      <p className="auth-link">
+      <p className={styles.link}>
         <Link to="/register">אין חשבון? הירשם</Link>
       </p>
     </div>

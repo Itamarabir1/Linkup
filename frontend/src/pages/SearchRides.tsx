@@ -4,7 +4,7 @@ import { api } from '../api/client';
 import type { Ride, DriverInfo, RideSearchResponse } from '../types/api';
 import { formatDateTimeNoSeconds } from '../utils/date';
 import { useAuth } from '../context/AuthContext';
-import './AppPages.css';
+import styles from './SearchRides.module.css';
 
 export default function SearchRides() {
   const { user } = useAuth();
@@ -148,31 +148,31 @@ export default function SearchRides() {
   };
 
   return (
-    <div className="page">
-      <h1 className="page-title">חפש טרמפ</h1>
-      <p className="page-meta" style={{ color: '#6b7280', marginBottom: '1rem' }}>
+    <div className={styles.page}>
+      <h1 className={styles.pageTitle}>חפש טרמפ</h1>
+      <p className={styles.pageMeta} style={{ color: '#6b7280', marginBottom: '1rem' }}>
         מוצא, יעד, רדיוס חיפוש (מטרים) וזמן יציאה אופציונלי – כמו בבקאנד.
       </p>
-      <form onSubmit={search} className="form-block">
+      <form onSubmit={search} className={styles.formBlock}>
         {error && (
-          <p className="page-error">
+          <p className={styles.pageError}>
             {error}
             {error.includes('פג תוקף') && (
               <> <Link to="/login" style={{ fontWeight: 600 }}>התחבר מחדש</Link></>
             )}
           </p>
         )}
-        <div className="form-row-with-btn">
+        <div className={styles.formRowWithBtn}>
           <input
             type="text"
             placeholder="מוצא (כתובת איסוף)"
             value={pickup}
             onChange={(e) => setPickup(e.target.value)}
-            className="form-input"
+            className={styles.formInput}
           />
           <button
             type="button"
-            className="btn btn-outline"
+            className={`${styles.btn} ${styles.btnOutline}`}
             onClick={fillPickupFromMyLocation}
             disabled={locationLoading}
           >
@@ -184,71 +184,71 @@ export default function SearchRides() {
           placeholder="יעד (כתובת)"
           value={destination}
           onChange={(e) => setDestination(e.target.value)}
-          className="form-input"
+          className={styles.formInput}
         />
-        <label className="form-label">רדיוס חיפוש (מטרים)</label>
+        <label className={styles.formLabel}>רדיוס חיפוש (מטרים)</label>
         <input
           type="number"
           min={100}
           value={searchRadius}
           onChange={(e) => setSearchRadius(parseInt(e.target.value, 10) || 1000)}
-          className="form-input"
+          className={styles.formInput}
         />
-        <label className="form-label">תאריך יציאה (אופציונלי – ריק = מעכשיו)</label>
+        <label className={styles.formLabel}>תאריך יציאה (אופציונלי – ריק = מעכשיו)</label>
         <input
           type="date"
           value={departureDate}
           onChange={(e) => setDepartureDate(e.target.value)}
-          className="form-input"
+          className={styles.formInput}
         />
-        <label className="form-label">שעת יציאה (אופציונלי)</label>
+        <label className={styles.formLabel}>שעת יציאה (אופציונלי)</label>
         <input
           type="time"
           value={departureTime}
           onChange={(e) => setDepartureTime(e.target.value)}
-          className="form-input"
+          className={styles.formInput}
         />
         <button
           type="submit"
-          className="btn btn-success"
+          className={`${styles.btn} ${styles.btnSuccess}`}
           disabled={searching}
         >
           {searching ? 'מחפש...' : 'חפש'}
         </button>
       </form>
-      <div className="card-list">
+      <div className={styles.cardList}>
         {results.length === 0 && pickup && destination && !searching ? (
           <div>
-            <p className="empty-text" style={{ marginBottom: '0.5rem' }}>לא נמצאו נסיעות.</p>
+            <p className={styles.emptyText} style={{ marginBottom: '0.5rem' }}>לא נמצאו נסיעות.</p>
             {user && currentRequestId ? (
-              <p className="page-meta" style={{ color: '#6b7280', fontSize: '0.9rem', textAlign: 'center', padding: '0.5rem', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+              <p className={styles.pageMeta} style={{ color: '#6b7280', fontSize: '0.9rem', textAlign: 'center', padding: '0.5rem', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
                 ✅ נסיעתך נכנסה ל-DB ותקבל התראות כאשר יימצאו נסיעות מתאימות.
               </p>
             ) : user ? (
-              <p className="page-meta" style={{ color: '#6b7280', fontSize: '0.9rem', textAlign: 'center', padding: '0.5rem', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
+              <p className={styles.pageMeta} style={{ color: '#6b7280', fontSize: '0.9rem', textAlign: 'center', padding: '0.5rem', background: '#f0f9ff', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
                 ✅ פרטי החיפוש שלך נשמרו ותקבל התראות כאשר יימצאו נסיעות מתאימות.
               </p>
             ) : null}
           </div>
         ) : (
           results.map((r) => (
-            <div key={r.ride_id} className="card">
-              <div className="card-route">
+            <div key={r.ride_id} className={styles.card}>
+              <div className={styles.cardRoute}>
                 {r.origin_name ?? '?'} → {r.destination_name ?? '?'}
               </div>
-              <div className="card-meta">
+              <div className={styles.cardMeta}>
                 {formatDateTimeNoSeconds(r.departure_time)} ·{' '}
                 {r.available_seats} מושבים
               </div>
               {r.route_summary && (
-                <div className="card-meta card-route-summary">
+                <div className={`${styles.cardMeta} ${styles.cardRouteSummary}`}>
                   כביש מרכזי: {r.route_summary}
                 </div>
               )}
-              <div className="card-actions" style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <div className={styles.cardActions} style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <button
                   type="button"
-                  className="btn btn-outline"
+                  className={`${styles.btn} ${styles.btnOutline}`}
                   onClick={() => fetchDriverInfo(r.ride_id)}
                   disabled={loadingDriverRideId === r.ride_id}
                 >
@@ -256,7 +256,7 @@ export default function SearchRides() {
                 </button>
                 <button
                   type="button"
-                  className="btn btn-success"
+                  className={`${styles.btn} ${styles.btnSuccess}`}
                   onClick={() => sendRequestToJoin(r)}
                   disabled={sendingRequestRideId !== null || requestSuccessRideId === r.ride_id}
                 >
@@ -268,12 +268,12 @@ export default function SearchRides() {
                 </button>
               </div>
               {requestErrorRideId === r.ride_id && requestErrorMessage && (
-                <p className="page-error" style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
+                <p className={styles.pageError} style={{ marginTop: '0.5rem', fontSize: '0.9rem' }}>
                   {requestErrorMessage}
                 </p>
               )}
               {driverInfoMap[r.ride_id] && (
-                <div className="card-meta" style={{ marginTop: '0.5rem', padding: '0.5rem', background: 'var(--surface)', borderRadius: 6 }}>
+                <div className={styles.cardMeta} style={{ marginTop: '0.5rem', padding: '0.5rem', background: 'var(--surface)', borderRadius: 6 }}>
                   <strong>נהג:</strong> {driverInfoMap[r.ride_id].full_name}
                   {driverInfoMap[r.ride_id].phone_number && (
                     <> · <a href={`tel:${driverInfoMap[r.ride_id].phone_number}`}>{driverInfoMap[r.ride_id].phone_number}</a></>

@@ -1,269 +1,159 @@
-# LinkUp
+# Linkup — Ride-Sharing Platform
 
-Ride-sharing / carpool backend and workers: auth, rides, bookings, notifications (email, push), outbox events, and maintenance.
-
----
-
-## Table of Contents
-
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
-- [Environment Variables](#environment-variables)
-- [Running Locally](#running-locally)
-- [Running with Docker](#running-with-docker)
-- [API Documentation](#api-documentation)
-- [Project Structure](#project-structure)
-- [Database Setup](#database-setup)
-- [Workers](#workers)
+A full-stack ride-sharing application where drivers post rides, passengers search and book, and real-time chat with AI-powered conversation summaries keeps everyone in sync.
 
 ---
 
-## Features
+## What Linkup Does
 
-- **Auth**: Register, login (JWT + refresh token), logout, refresh token, email verification (one-click link + form), password reset
-- **Users**: Profile, update, FCM token
-- **Rides**: Create, list, cancel; PostGIS for routes
-- **Bookings & Passenger requests**: Join rides, approve/reject, maintenance (expire/complete)
-- **Notifications**: Email (Brevo), push (FCM); event-driven via RabbitMQ + outbox
-- **Outbox**: Reliable event dispatch (exchange + routing_key from `event_name`)
-- **Maintenance**: Scheduler for expired rides, passenger requests, bookings
+Linkup connects drivers and passengers for shared rides. Drivers publish trips with origin, destination, date, and available seats. Passengers search, send booking requests, and get approved or rejected by drivers. Once a booking is confirmed, driver and passenger chat in real time over WebSocket. When a conversation ends, an AI pipeline (Groq / Llama) analyzes the chat and sends an email summary. The app supports Google OAuth and email/password login, profile avatars (S3), geo routing and distance calculation, and push, email, and in-app notifications—all backed by an outbox pattern for reliable event delivery.
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+    subgraph clients
+        FE[Frontend\nReact/Vite]
+        MO[Mobile\nExpo]
+    end
+
+    subgraph services
+        API[Backend\nFastAPI]
+        WS[chat-ws\nGo]
+    end
+
+    subgraph data
+        PG[(PostgreSQL\n+ PostGIS)]
+        R0[Redis DB=0]
+        R1[Redis DB=1]
+        MQ[RabbitMQ]
+    end
+
+    FE --> API
+    FE --> WS
+    MO --> API
+    MO --> WS
+    API --> PG
+    API --> R0
+    API --> MQ
+    API --> R1
+    WS --> R1
+```
+
+- **Frontend / Mobile** → REST to backend, WebSocket to chat-ws.  
+- **Backend** → PostgreSQL (data), Redis DB=0 (cache, rate limit, outbox worker), Redis DB=1 (chat completion events), RabbitMQ (async tasks, notifications).  
+- **chat-ws** → Redis DB=1 only (subscribe to chat channels, fan out to connected clients).
+
+---
+
+## Services
+
+| Service   | Language        | Role |
+|----------|------------------|------|
+| backend  | Python (FastAPI) | REST API, auth, rides, bookings, chat CRUD, AI summary (Celery), notifications, outbox worker |
+| chat-ws  | Go               | WebSocket server; real-time message delivery only (no business logic) |
+| frontend | React / TypeScript | Web app (Vite); Hebrew RTL |
+| mobile   | React Native / Expo | Mobile app (TypeScript) |
 
 ---
 
 ## Tech Stack
 
-| Layer        | Stack |
-|-------------|--------|
-| **API**     | FastAPI, Pydantic, SQLAlchemy 2 (async + asyncpg) |
-| **DB**      | PostgreSQL 15 + PostGIS |
-| **Cache**   | Redis |
-| **Messaging** | RabbitMQ (aio-pika), optional Kafka |
-| **Email**   | Brevo (Sendinblue) |
-| **Push**    | Firebase (FCM) |
-| **Storage** | AWS S3 (optional) |
-| **Frontend** | Vite + React (web only, in `frontend/`) |
+| Category      | Technologies |
+|---------------|--------------|
+| **Backend**   | Python, FastAPI, PostgreSQL, PostGIS, SQLAlchemy (async), Alembic, Redis, RabbitMQ, Celery, Firebase (FCM), S3, Groq (AI) |
+| **Real-time** | Go (chat-ws), Redis Pub/Sub |
+| **Frontend**  | React, TypeScript, Vite, Google Maps |
+| **Mobile**    | React Native, Expo, TypeScript |
+| **Infrastructure** | Docker, Docker Compose, Kubernetes (manifests in repo) |
+| **Cloud / CI**| Render, GitHub Actions (backend, chat-ws, frontend) |
 
 ---
 
-## Prerequisites
+## Key Features
 
-- Python 3.11+
-- PostgreSQL 15+ with PostGIS
-- Redis
-- RabbitMQ
-- Node.js 20+ (for frontend)
-
----
-
-## Quick Start
-
-1. Clone and enter the repo:
-   ```bash
-   cd Linkup
-   ```
-
-2. Backend: copy env and install:
-   ```bash
-   cd backend
-   cp .env.example .env   # or create .env (see [Environment Variables](#environment-variables))
-   pip install -r requirements.txt
-   ```
-
-3. Database: create DB and run schema:
-   ```bash
-   psql -U admin -d linkup_app -f ../db/schema.sql
-   ```
-
-4. Run API:
-   ```bash
-   uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
-   ```
-
-5. (Optional) Run workers:
-   ```bash
-   python -m app.workers.main_worker
-   ```
-
-6. API: <http://localhost:8080>  
-   Docs: <http://localhost:8080/docs>
+- ✅ Ride search, booking requests, and driver approve/reject
+- ✅ Real-time chat (WebSocket) between driver and passenger
+- ✅ AI conversation summary (Groq / Llama) and email on chat end
+- ✅ Push (FCM), email (Brevo), and in-app notifications
+- ✅ Google OAuth and email/password auth with JWT + refresh
+- ✅ Geo: distance, route display, PostGIS-backed queries
+- ✅ Profile and avatar upload (S3)
+- ✅ Outbox pattern for reliable event publishing to RabbitMQ
+- ✅ Kubernetes-ready (manifests in `k8s/`)
 
 ---
 
-## Environment Variables
+## Getting Started
 
-### מקור אמת (Single source of truth)
-
-- **בקאנד** (`backend/.env`): כל המפתחות והסודות מוגדרים כאן. העתק מ-`backend/.env.example` ומלא ערכים.
-- **פרונט** (`frontend/.env`): רק כתובת ה-API (`VITE_API_URL`) וחוויית פיתוח. מפתחות שצריך בדפדפן (למשל Google Maps לתצוגת מפה) **לא** מוגדרים בפרונט – הפרונט מקבל אותם מהבקאנד דרך API (למשל `GET /api/v1/geo/maps-key`). כך יש מקור אמת אחד ומחזור מפתחות במקום אחד.
-
-Create `backend/.env` (copy from `backend/.env.example`). Main variables:
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `SECRET_KEY` | JWT signing key (required) | `your-secret-key` |
-| `POSTGRES_HOST` | PostgreSQL host | `localhost` |
-| `POSTGRES_USER` | DB user | `admin` |
-| `POSTGRES_PASSWORD` | DB password | `password123` |
-| `POSTGRES_DB` | DB name | `linkup_app` |
-| `REDIS_HOST` | Redis host | `localhost` |
-| `RABBITMQ_HOST` | RabbitMQ host | `localhost` |
-| `FRONTEND_URL` | Frontend base URL (redirects) | `https://linkup.co.il` |
-| `API_PUBLIC_URL` | Public API URL (email verification link) | `https://api.linkup.co.il` |
-| `GOOGLE_MAPS_API_KEY` | Google Maps API key – Geocoding, Directions, Distance Matrix. גם נשלח לפרונט ל-Maps JavaScript API דרך `GET /api/v1/geo/maps-key`. | — |
-| `FORCE_HTTPS_REDIRECT` | Redirect HTTP → HTTPS (set `true` when behind Nginx/Cloudflare) | `false` |
-| `CORS_ORIGINS` | Allowed CORS origins (JSON list or leave empty to use FRONTEND_URL) | — |
-| `RATE_LIMIT_AUTH_WINDOW_SECONDS` | Rate limit window for auth endpoints (seconds) | `60` |
-| `RATE_LIMIT_AUTH_MAX_REQUESTS` | Max requests per IP per window for auth | `10` |
-| `BREVO_API_KEY` | Brevo API key (email) | — |
-| `BREVO_SENDER_NAME` | Sender name in emails | `LinkUp` |
-
-See `app/core/config.py` for the full list and defaults.
-
-**Frontend** (`frontend/.env`): Copy from `frontend/.env.example`. Required: `VITE_API_URL`. Optional: `VITE_GOOGLE_MAPS_API_KEY` (only if you need to override; normally the frontend gets the Maps key from the backend).
-
----
-
-## HTTPS (Production)
-
-In production, TLS (HTTPS) is usually handled by a **reverse proxy** (Nginx, Caddy, Cloudflare) in front of the API. The proxy terminates SSL and forwards requests to the app (e.g. `http://127.0.0.1:8080`) with headers like `X-Forwarded-Proto` and `X-Forwarded-Host`.
-
-- Set **`FORCE_HTTPS_REDIRECT=true`** in `.env` so that any HTTP request reaching the app is redirected to HTTPS (301). The app uses `X-Forwarded-Proto` to detect HTTP.
-- Ensure the proxy passes `X-Forwarded-Proto: https` and `X-Forwarded-Host: your-api-domain` to the backend.
-- For local development, leave `FORCE_HTTPS_REDIRECT=false` (default).
-
----
-
-## Security (summary)
-
-- **CORS**: Allowed origins from `CORS_ORIGINS` or `FRONTEND_URL`; credentials and common methods/headers allowed.
-- **HTTPS**: Redirect HTTP → HTTPS when `FORCE_HTTPS_REDIRECT=true` and behind a proxy that sets `X-Forwarded-Proto`.
-- **Security headers**: `X-Content-Type-Options`, `X-Frame-Options`, `X-XSS-Protection`, `Referrer-Policy` on all responses; **HSTS** (`Strict-Transport-Security`: max-age=31536000; includeSubDomains) added only when the request is over HTTPS (scheme or `X-Forwarded-Proto`).
-- **Rate limiting**: Auth endpoints (login, refresh, forgot-password, password-reset/request) limited per IP via Redis (configurable window and max requests); fail-open if Redis is down.
-- **Logout**: `POST /auth/logout` (with access token) clears the user’s refresh token in the DB.
-
----
-
-## Running Locally
-
-- **API only**
-  ```bash
-  cd backend && uvicorn app.main:app --reload --port 8080
-  ```
-
-- **Workers** (outbox, notifications, maintenance)
-  ```bash
-  cd backend && python -m app.workers.main_worker
-  ```
-
-- **Frontend (web)**
-  ```bash
-  cd frontend && npm install && npm run dev
-  ```
-  Then open <http://localhost:5173>. The app is Hebrew RTL (login, register, my rides, create ride, search, my requests, profile).
-
-Ensure PostgreSQL, Redis, and RabbitMQ are running (e.g. via Docker for infra only).
-
----
-
-## Running with Docker
-
-From the project root:
+**Prerequisites:** Docker, Docker Compose.
 
 ```bash
-docker compose up -d
+git clone <repository-url>
+cd Linkup
 ```
 
-- **API (Backend)**: <http://localhost:8000>
-- **RabbitMQ management**: <http://localhost:15672> (guest/guest)
-- **Chat WebSocket**: <ws://localhost:8081/ws?token=JWT>
+Create environment files (see `backend/.env.example`, `frontend/.env.example`, `chat-ws/.env.example` for required variables):
 
-Apply DB schema once (see [Database Setup](#database-setup)).
+```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+cp chat-ws/.env.example chat-ws/.env
+# Edit *.env and set secrets (DB, Redis, RabbitMQ, JWT, Brevo, Google, Groq, S3, Firebase, etc.)
+```
 
----
+For local development with hot-reload:
 
-## API Documentation
+```bash
+cp docker-compose.override.yml.example docker-compose.override.yml
+```
 
-- **Swagger UI**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- **ReDoc**: [http://localhost:8000/redoc](http://localhost:8000/redoc)
+Start the stack:
 
-Base path for v1: `/api/v1` (e.g. `/api/v1/auth/login`, `/api/v1/rides`).
+```bash
+docker compose up --build
+```
+
+- **API:** <http://localhost:8000> — Docs: <http://localhost:8000/docs>  
+- **Frontend:** run separately with `cd frontend && npm install && npm run dev` (or add to compose)  
+- **Chat WebSocket:** <ws://localhost:8081/ws?token=JWT>
+
+Apply the database schema once (see `db/schema.sql`) and run migrations: `cd backend && alembic upgrade head`.
 
 ---
 
 ## Project Structure
 
-מבנה מונורפו – כולם תחת שורש הפרויקט; `docker-compose` והגדרות DB בשורש.
-
-```
-Linkup/
-├── docker-compose.yml     # שורש – כל השירותים (db, redis, rabbitmq, backend, outbox-worker, chat-ws)
-├── db/                    # שורש – סכמה ומיגרציות SQL
-│   ├── schema.sql         # סכמה ראשית (להריץ פעם אחת בסביבה חדשה)
-│   └── migrations/        # סקריפטי SQL לשינויים (לשמור ב-Git, להריץ לפי צורך)
-├── backend/
-│   ├── app/
-│   │   ├── main.py        # נקודת כניסה ל-API (uvicorn app.main:app)
-│   │   ├── api/           # Routers, dependencies
-│   │   ├── core/          # Config, security, exceptions, lifespan
-│   │   ├── db/            # Session, base
-│   │   ├── domain/        # Auth, users, rides, bookings, passengers, notifications, events
-│   │   ├── infrastructure/# Outbox, RabbitMQ, Redis, S3
-│   │   └── workers/       # Outbox worker, notification/maintenance tasks
-│   ├── alembic/           # מיגרציות Python (Alembic) – היסטוריית שינויים, לשמור ב-Git
-│   └── requirements.txt
-├── frontend/              # Web (Vite + React, RTL Hebrew)
-├── mobile/                # אפליקציית מובייל (Expo)
-└── chat-ws/               # שרת WebSocket לצ'אט (Go)
-```
-
-- **docker-compose** – בשורש, כדי להריץ את כל המערכת (DB, backend, workers, chat) בפקודה אחת.
-- **main** – נמצא ב-`backend/app/main.py` (לא בתיקייה נפרדת "main").
-- **migrations** – `db/migrations/` ו-`backend/alembic/` נשארים ב-repo: מריצים אותם פעם (או בכל סביבה), אבל הקבצים עצמם נשמרים כדי שכל מי שמשכפל יוכל להריץ את אותן מיגרציות.
+| Folder      | Description |
+|------------|-------------|
+| `backend/` | FastAPI app: API, domain logic, workers (outbox, notifications, chat completion listener), Alembic migrations |
+| `chat-ws/` | Go WebSocket server: Redis subscribe, JWT auth, message fan-out to clients |
+| `frontend/`| React (Vite) web app; Dockerfile + nginx.conf for production build |
+| `mobile/`  | React Native (Expo) app |
+| `k8s/`     | Kubernetes base, backend, chat-ws, frontend, infra (Postgres, Redis, RabbitMQ) |
+| `db/`      | Reference schema (`schema.sql`) and utility scripts; migrations live in `backend/alembic/` |
+| `docs/`    | Architecture and operational notes |
 
 ---
 
-## Database Setup
+## Architecture Decisions
 
-1. Create the database (if not exists):
-   ```bash
-   createdb -U admin linkup_app
-   ```
+- **Go for chat-ws (not Python).** WebSocket servers benefit from low per-connection overhead and high concurrency. Go’s goroutines and small footprint fit many idle connections; the service does no DB or business logic—only subscribe to Redis and push to clients. Keeping it in Go avoids pulling the full Python stack into the real-time path.
 
-2. Apply schema (creates tables and enums):
-   ```bash
-   psql -U admin -d linkup_app -f db/schema.sql
-   ```
+- **Redis DB separation (DB=0 vs DB=1).** Backend uses Redis for cache, rate limiting, and outbox-related state on DB=0. Chat traffic (pub/sub for messages and completion events) uses DB=1 so that chat-ws and the backend’s chat-completion listener can share the same Redis instance without key or namespace clashes and without backend cache evictions affecting chat.
 
-3. For Docker Postgres, run the same from host or from a one-off container:
-   ```bash
-   docker exec -i linkup_db psql -U admin -d linkup_app < db/schema.sql
-   ```
+- **Celery (in backend) for AI chat summary (not a separate service).** The AI flow is “on conversation end, analyze and persist.” That fits a background task in the same process that already has the domain logic and DB access. A dedicated microservice would duplicate models, config, and deployment surface. The backend publishes a completion event to Redis DB=1; the outbox worker (same codebase) subscribes and runs the existing `handle_conversation_completion` logic. One less service to deploy and monitor.
 
-If tables like `bookings` or `passenger_requests` are missing, maintenance and related features will log warnings until the schema is applied.
+- **Outbox pattern.** Notifications (email, push) and other side effects are triggered by domain events. Publishing directly to RabbitMQ in the same transaction as the DB write would risk losing events on crash or broker failure. Writing the event to an `outbox_events` table in the same transaction, then having a worker poll and publish to RabbitMQ, keeps “at-least-once” delivery and keeps the API response fast and independent of broker latency.
 
 ---
 
-## Event metadata (exchange + routing_key)
+## CI/CD
 
-- **מקור אמת**: `domain/events/routing.py` – `get_routing_metadata(event_name)` מחזיר `exchange` ו-`routing_key`.
-- **exchange** = דומיין (user, ride, booking) – כל המשימות שקשורות למשתמש (מייל רישום, אימות, איפוס סיסמה) יוצאות ל-exchange `"user"`.
-- **routing_key** = `event_name` – כל משימה מקבלת מפתח ייחודי (למשל `auth.email_verification`, `user.registered`). ה-handler מזהה לפי ה-routing_key איזה לוגיקה להריץ.
-- **תור אחד + וורקר אחד**: `notifications_queue` מקושר לכל ה-exchanges (user, ride, booking, system_events). וורקר אחד מקבל את כל ההודעות; ה-`routing_key` שבכל הודעה קובע איזה handler (מייל/פוש) להפעיל. אין צורך בתור נפרד לכל סוג מייל.
+- **Backend:** GitHub Actions — lint (Ruff), tests (pytest). Workflow: `.github/workflows/backend-ci.yml`.
+- **chat-ws:** GitHub Actions — dependency download, build, vet. Workflow: `.github/workflows/chat-ws-ci.yml`.
+- **Frontend:** GitHub Actions — install, lint, build. Workflow: `.github/workflows/frontend-ci.yml`.
 
-השירותים (למשל auth) כותבים לאוטבוקס רק `event_name` + `payload`; ה-metadata מתווסף אוטומטית בעת העיבוד ב-OutboxService.
-
----
-
-## Workers
-
-- **Outbox worker**: קורא אירועים ממתינים מ-`outbox_events`, בונה `Event` עם metadata מ-`get_routing_metadata(event_name)`, שולח ל-RabbitMQ (exchange + routing_key).
-- **Notification consumer**: מקשיב ל-`notifications_queue` (מקושר ל-user, ride, booking, system_events). מטפל באירועים לפי `routing_key` (למשל `auth.email_verification`, `user.registered`) – שולח מייל/פוש לפי המפות.
-- **Maintenance scheduler**: מעדכן נסיעות/בקשות/הזמנות שפג תוקף (דורש טבלאות ו-enums ב-DB).
-
----
-
-## License
-
-Private / proprietary unless otherwise stated.
+Production-style deployment is defined in `render.yaml` (Render) and in `k8s/` for Kubernetes.

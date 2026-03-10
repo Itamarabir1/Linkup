@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.api.dependencies.auth import get_current_user
 from app.domain.users.model import User
 from app.domain.geo.processor import get_address_from_gps
-from app.domain.geo.schemas import AddressFromCoordsResponse
+from app.domain.geo.schema import AddressFromCoordsResponse
 from app.core.exceptions.validation import InvalidLocationError
 
 router = APIRouter(tags=["Geo"])

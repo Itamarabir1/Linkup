@@ -31,7 +31,7 @@ class RecipientResolver:
         מחזיר User (נמען) או None.
         strategy["role"] קובע: self → source הוא User; driver → נהג מה־Ride/Booking; passenger → נוסע מה־Booking.
         """
-        from app.domain.notifications.config.mappings.index import NOTIFICATION_STRATEGY
+        from app.domain.notifications.config.mappings import NOTIFICATION_STRATEGY
         strategy = NOTIFICATION_STRATEGY.get(event_key)
         if not strategy:
             logger.warning("No strategy for event_key=%s", event_key)

@@ -6,7 +6,7 @@ import sys
 # Infrastructure
 from app.infrastructure.rabbitmq.client import rabbit_client
 from app.infrastructure.rabbitmq.consumer import RabbitMQConsumer
-from app.infrastructure.events.dispacher.registry import DispatcherFactory
+from app.infrastructure.events.dispatcher.factory import DispatcherFactory
 from app.domain.events.routing import (
     NOTIFICATION_EXCHANGES,
     AVATAR_UPLOAD_EXCHANGES,
@@ -27,6 +27,7 @@ from app.workers.tasks.scheduled_tasks import (
     run_scheduled_tasks_publisher,
     handle_scheduled_task,
 )
+from app.workers.tasks.chat_summary_task import run_chat_completion_redis_listener
 
 # הגדרת לוגר
 logging.basicConfig(level=logging.INFO)
@@ -85,6 +86,7 @@ async def main():
             asyncio.create_task(scheduled_tasks_consumer.consume(callback=handle_scheduled_task)),
             asyncio.create_task(run_scheduled_tasks_publisher()),
             asyncio.create_task(run_outbox_worker(dispatcher=dispatcher)),
+            asyncio.create_task(run_chat_completion_redis_listener(stop_event)),
         ]
 
         logger.info(f"✅ All {len(tasks)} workers are running. Press Ctrl+C to stop.")
