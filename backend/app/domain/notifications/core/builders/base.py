@@ -15,12 +15,17 @@ def _get_base_url_for_links() -> str:
     """
     try:
         from app.core.config import settings
+
         base = getattr(settings, "FRONTEND_URL", "") or "https://linkup.co.il"
         base = (base or "").strip().rstrip("/")
         if not base:
             return "https://linkup.co.il"
         # קישורים במייל חייבים HTTPS כדי שלא יופיע "החיבור שלך פרטי" (מלבד localhost לפיתוח)
-        if base.startswith("http://") and "localhost" not in base and "127.0.0.1" not in base:
+        if (
+            base.startswith("http://")
+            and "localhost" not in base
+            and "127.0.0.1" not in base
+        ):
             base = "https://" + base[7:]
         return base
     except Exception:
@@ -34,11 +39,11 @@ class BaseContextBuilder(ABC):
     """
 
     BASE_URL = "https://itamarabir.com"
-    
+
     # שימוש ב-Hex Codes - חובה למיילים (Gmail/Outlook לא תמיד אוהבים "red")
-    COLOR_SUCCESS = "#28a745" # ירוק
+    COLOR_SUCCESS = "#28a745"  # ירוק
     COLOR_DANGER = "#dc3545"  # אדום
-    COLOR_INFO = "#17a2b8"    # כחול
+    COLOR_INFO = "#17a2b8"  # כחול
 
     @abstractmethod
     def build(self, data: Union[BaseModel, Any], event_key: str) -> Dict[str, Any]:
@@ -51,13 +56,13 @@ class BaseContextBuilder(ABC):
 
     def _resolve_attr(self, obj: Any, path: str, default: Any = "") -> Any:
         """
-        Safe Navigation Utility. 
+        Safe Navigation Utility.
         סניור תומך גם ב-getattr (אובייקט) וגם ב-get (מילון/סכמה).
         דוגמה: 'ride.driver.full_name' יעבוד גם אם זה Dict וגם אם זה Model.
         """
         if obj is None:
             return default
-            
+
         current = obj
         try:
             for attr in path.split("."):
@@ -67,7 +72,7 @@ class BaseContextBuilder(ABC):
                     current = getattr(current, attr, None)
                 else:
                     current = getattr(current, attr, None)
-                
+
                 if current is None:
                     return default
             return current
@@ -85,17 +90,21 @@ class BaseContextBuilder(ABC):
         """Visual logic shared across all notification types using professional hex codes."""
         if not event_key:
             return self.COLOR_SUCCESS
-            
+
         danger_keywords = {"cancel", "reject", "fail", "delete", "stop", "urgent"}
         event_lower = event_key.lower()
-        
+
         if any(word in event_lower for word in danger_keywords):
             return self.COLOR_DANGER
-            
+
         return self.COLOR_SUCCESS
 
     def _get_cta_url(self, path: str) -> str:
         """בונה לינק לכפתור במייל – משתמש ב-FRONTEND_URL כדי שהלינק יפתח את האפליקציה."""
         clean_path = path.lstrip("/")
         base = _get_base_url_for_links()
-        return f"{base.rstrip('/')}/{clean_path}" if base else f"{self.BASE_URL}/{clean_path}"
+        return (
+            f"{base.rstrip('/')}/{clean_path}"
+            if base
+            else f"{self.BASE_URL}/{clean_path}"
+        )

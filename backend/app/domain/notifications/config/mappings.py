@@ -2,6 +2,7 @@
 מקור אמת יחיד: Event → Builder + template key + channels.
 נתיב תבנית + subject/push ממולאים ב-Handler מ-EMAIL_MAP ו-PUSH_TEMPLATES.
 """
+
 from app.domain.notifications.constants import NotificationEvent
 
 from app.domain.notifications.core.builders.user_builder import UserBuilder

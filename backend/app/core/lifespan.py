@@ -10,17 +10,18 @@ from app.infrastructure.redis.broadcast import broadcast
 
 logger = logging.getLogger(__name__)
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     ניהול מחזור החיים של האפליקציה (Lifespan).
-    מבטיח שכל התשתיות (RabbitMQ, Redis Caching, Redis Broadcast) 
+    מבטיח שכל התשתיות (RabbitMQ, Redis Caching, Redis Broadcast)
     עולות ויורדות בצורה מסודרת ואטומיות.
     """
-    
+
     # --- Startup Phase ---
     logger.info("🚀 [Lifespan] Starting up: Initializing infrastructure...")
-    
+
     # 1. חיבור ל-RabbitMQ (אופציונלי – Worker צורך; API יכול לרוץ בלי)
     try:
         await rabbit_client.connect()
@@ -36,11 +37,11 @@ async def lifespan(app: FastAPI):
         # 2. חיבור ל-Redis Client (עבור Caching ו-State)
         await redis_client.connect()
         logger.info("✅ [Lifespan] Redis Client connected")
-        
+
         # 3. חיבור ל-Redis Pub/Sub (עבור פרסום הודעות צ'אט ל-WS)
         await redis_pubsub.connect()
         logger.info("✅ [Lifespan] Redis Pub/Sub connected")
-        
+
         # 4. חיבור ל-Redis Broadcast (עבור Real-time Websockets/UI)
         await broadcast.connect()
         logger.info("✅ [Lifespan] Redis Broadcast connected")
@@ -52,11 +53,11 @@ async def lifespan(app: FastAPI):
         )
 
     # כאן האפליקציה מתחילה לקבל בקשות (FastAPI Running)
-    yield 
+    yield
 
     # --- Shutdown Phase ---
     logger.info("🛑 [Lifespan] Shutting down: Cleaning up infrastructure...")
-    
+
     try:
         await rabbit_client.close()
         if redis_ok:

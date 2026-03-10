@@ -7,6 +7,7 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+
 class RabbitMQClient:
     def __init__(self):
         self._connection: Optional[aio_pika.abc.AbstractConnection] = None
@@ -19,8 +20,7 @@ class RabbitMQClient:
         async with self._lock:
             if self._connection is None or self._connection.is_closed:
                 self._connection = await aio_pika.connect_robust(
-                    settings.RABBITMQ_URL,
-                    timeout=10
+                    settings.RABBITMQ_URL, timeout=10
                 )
                 self._channel = await self._connection.channel()
                 logger.info("✅ RabbitMQ Client connected")
@@ -32,7 +32,7 @@ class RabbitMQClient:
 
     async def publish(self, message: dict, routing_key: str, exchange_name: str = ""):
         channel = await self.get_channel()
-        
+
         if exchange_name:
             if exchange_name not in self._exchanges:
                 self._exchanges[exchange_name] = await channel.declare_exchange(
@@ -46,7 +46,7 @@ class RabbitMQClient:
             aio_pika.Message(
                 body=json.dumps(message).encode(),
                 delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-                content_type="application/json"
+                content_type="application/json",
             ),
             routing_key=routing_key,
         )
@@ -57,5 +57,5 @@ class RabbitMQClient:
                 await self._connection.close()
                 logger.info("🛑 RabbitMQ Connection closed")
 
-rabbit_client = RabbitMQClient()
 
+rabbit_client = RabbitMQClient()

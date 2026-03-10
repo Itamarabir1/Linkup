@@ -2,6 +2,7 @@
 ראוטר צ'אט 1:1 – שיחות והודעות.
 כל ה-endpoints דורשים אימות (get_current_user).
 """
+
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -215,10 +216,7 @@ async def export_conversation_calendar(
     דורש ניתוח AI קיים או מנתח על המקום.
     """
     from app.domain.chat.calendar_export import get_conversation_for_calendar_export
-    from app.domain.chat.calendar.exporter import export_rides_to_ical_bytes
-    from app.domain.chat.ai.schema import RideSummary
-    from datetime import datetime
-    
+
     # איסוף נתוני שיחה
     conv_data = await get_conversation_for_calendar_export(
         db, conversation_id, current_user.user_id
@@ -228,15 +226,15 @@ async def export_conversation_calendar(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="השיחה לא נמצאה או שאין לך גישה אליה",
         )
-    
+
     # TODO: כאן צריך לנתח את השיחה או להשתמש בתוצאות קיימות
     # כרגע - placeholder - צריך לשלב עם AI analyzer
     # בינתיים נחזיר שגיאה אם אין ניתוח
-    
+
     # יצירת RideSummary מהודעות (placeholder - צריך ניתוח AI אמיתי)
     # ride = RideSummary(...)
     # ical_bytes = export_rides_to_ical_bytes([ride])
-    
+
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
         detail="ייצוא ללוח שנה דורש ניתוח AI - עדיין לא מומש",

@@ -2,6 +2,7 @@
 משימות מתוזמנות דרך התור (גישה סניורית).
 מתזמן שולח הודעות ל־RabbitMQ; consumer מושך ומריץ את הלוגיקה.
 """
+
 import asyncio
 import logging
 import time

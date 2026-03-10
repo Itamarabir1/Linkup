@@ -5,6 +5,7 @@ from app.domain.system.maintenance_crud import crud_maintenance
 
 logger = logging.getLogger(__name__)
 
+
 class MaintenanceService:
     """
     Service layer to manage system-wide maintenance.
@@ -22,12 +23,13 @@ class MaintenanceService:
                 "rides": rides,
                 "expired_requests": req_exp,
                 "completed_requests": req_comp,
-                "bookings": bookings
+                "bookings": bookings,
             }
         except Exception as e:
             await db.rollback()
             logger.error(f"❌ Maintenance Service Error: {str(e)}", exc_info=True)
             raise
+
 
 # יצירת מופע יחיד לייבוא בשאר המערכת
 maintenance_service = MaintenanceService()

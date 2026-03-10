@@ -5,6 +5,7 @@ from app.core.exceptions.infrastructure import InfrastructureError
 
 logger = logging.getLogger(__name__)
 
+
 class RedisBroadcast:
     def __init__(self):
         # שימוש ב-settings.REDIS_URL כדי שהכל יהיה קונפיגורבילי
@@ -31,6 +32,7 @@ class RedisBroadcast:
         זה מאפשר לעשות: async with broadcast.subscribe(...)
         """
         return self.engine.subscribe(channel=channel)
+
 
 # Instance יחיד לכל האפליקציה
 broadcast = RedisBroadcast()

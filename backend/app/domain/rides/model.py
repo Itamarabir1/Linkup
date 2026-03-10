@@ -1,4 +1,14 @@
-from sqlalchemy import Column, Integer, String, DateTime, Numeric, Index, text, Boolean, ForeignKey
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    DateTime,
+    Numeric,
+    Index,
+    text,
+    Boolean,
+    ForeignKey,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from sqlalchemy.types import TypeDecorator
@@ -26,45 +36,61 @@ def _ride_status_from_db(value):
 
 class RideStatusEnumType(TypeDecorator):
     """Wraps PG ride_status enum so result accepts both value ('open') and name ('OPEN') from DB."""
-    impl = PG_ENUM(RideStatus, name="ride_status", create_type=False, values_callable=lambda x: [e.value for e in x])
+
+    impl = PG_ENUM(
+        RideStatus,
+        name="ride_status",
+        create_type=False,
+        values_callable=lambda x: [e.value for e in x],
+    )
     cache_ok = True
 
     def process_result_value(self, value, dialect):
         return _ride_status_from_db(value)
+
 
 class Ride(Base):
     """
     Ride Entity - Senior Edition.
     מייצג נסיעה שהוצעה ע"י נהג (User בתפקיד Driver).
     """
+
     __tablename__ = "rides"
 
     ride_id = Column(Integer, primary_key=True, index=True)
-    
+
     # ה-FK שמחבר את הנסיעה ל-User הפיזי (הנהג)
-    driver_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
-    
+    driver_id = Column(
+        Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
+    )
+
     # --- זמנים ---
     departure_time = Column(DateTime(timezone=True), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     estimated_arrival_time = Column(DateTime(timezone=True), nullable=True)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
 
     # --- מיקומים (PostGIS) ---
     origin_name = Column(String(255))
     destination_name = Column(String(255))
-    origin_geom = Column(Geography(geometry_type='POINT', srid=4326), nullable=False)
-    destination_geom = Column(Geography(geometry_type='POINT', srid=4326), nullable=False)
-    route_coords = Column(Geography(geometry_type='LINESTRING', srid=4326), nullable=True)
+    origin_geom = Column(Geography(geometry_type="POINT", srid=4326), nullable=False)
+    destination_geom = Column(
+        Geography(geometry_type="POINT", srid=4326), nullable=False
+    )
+    route_coords = Column(
+        Geography(geometry_type="LINESTRING", srid=4326), nullable=True
+    )
     route_summary = Column(String(255), nullable=True)  # סיכום המסלול (כביש) מגוגל
-    
+
     # --- נתונים פיזיים (מותאם ל-SQL שלך) ---
     distance_km = Column(Numeric(10, 2), nullable=True)
     duration_min = Column(Numeric(10, 2), nullable=True)
-    
+
     # שים לב: שיניתי ל-available_seats כדי שיתאים לשם העמודה ב-SQL ששלחת
-    available_seats = Column(Integer, nullable=False, default=4) 
-    
+    available_seats = Column(Integer, nullable=False, default=4)
+
     price = Column(Numeric(10, 2), default=0.0)
     reminder_sent = Column(Boolean, default=False, nullable=False)
 
@@ -79,15 +105,15 @@ class Ride(Base):
     )
 
     __table_args__ = (
-        Index('idx_ride_route_gist', 'route_coords', postgresql_using='gist'),
-        Index('idx_ride_time_status', 'departure_time', 'status'),
+        Index("idx_ride_route_gist", "route_coords", postgresql_using="gist"),
+        Index("idx_ride_time_status", "departure_time", "status"),
     )
 
     # --- Relationships (Senior Standard) ---
-    
+
     # הקשר ל-User: 'rides_as_driver' חייב להופיע ב-back_populates של מודל User
     driver = relationship("User", back_populates="rides_as_driver")
-    
+
     # הקשר ל-Bookings: כל המושבים שנתפסו בנסיעה הזו (lazy=select – נטען רק בעת גישה, כדי ש-refresh אחרי יצירת נסיעה לא ייכשל אם טבלת bookings עדיין לא קיימת)
     bookings = relationship(
         "Booking",
@@ -107,7 +133,11 @@ class Ride(Base):
     def occupied_seats(self) -> int:
         """מחשב כמה מושבים תפוסים בפועל על בסיס הזמנות מאושרות בלבד"""
         # אופטימיזציה: סכימת המושבים מתוך רשימת הבוקינגס בזיכרון
-        return sum(b.num_seats for b in self.bookings if b.status not in ["cancelled", "rejected"])
+        return sum(
+            b.num_seats
+            for b in self.bookings
+            if b.status not in ["cancelled", "rejected"]
+        )
 
     @property
     def seats_left(self) -> int:

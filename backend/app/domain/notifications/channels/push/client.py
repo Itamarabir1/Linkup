@@ -2,10 +2,15 @@ import logging
 import asyncio
 from typing import Optional, Dict
 from firebase_admin import messaging
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from app.core.config import settings
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
 
 logger = logging.getLogger(__name__)
+
 
 class FCMClient:
     """
@@ -16,12 +21,14 @@ class FCMClient:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=4, max=60),
         # חשוב: לא מנסים שוב אם הטוקן לא חוקי (שגיאת 400/404 של פיירבייס)
-        retry=retry_if_exception_type(Exception), 
+        retry=retry_if_exception_type(Exception),
         before_sleep=lambda retry_state: logger.info(
             f"⏳ Push failed, retrying... (Attempt {retry_state.attempt_number})"
-        )
+        ),
     )
-    async def send(self, token: str, title: str, body: str, data: Optional[Dict] = None):
+    async def send(
+        self, token: str, title: str, body: str, data: Optional[Dict] = None
+    ):
         """
         שם הפונקציה שונה ל-'send' כדי להתאים לממשק ה-Provider.
         """
@@ -32,25 +39,23 @@ class FCMClient:
         # הכנת ההודעה (Firebase SDK)
         # שים לב: כל הערכים בתוך data חייבים להיות Strings ב-FCM
         safe_data = {k: str(v) for k, v in (data or {}).items()}
-        
+
         message = messaging.Message(
             notification=messaging.Notification(title=title, body=body),
             data=safe_data,
-            token=token
+            token=token,
         )
 
         loop = asyncio.get_event_loop()
         try:
             # הרצה ב-executor מונעת חסימה של ה-Event Loop
-            response = await loop.run_in_executor(
-                None, 
-                lambda: messaging.send(message)
-            )
+            response = await loop.run_in_executor(None, lambda: messaging.send(message))
             logger.info(f"✅ Push sent successfully: {response}")
             return response
         except Exception as e:
             logger.error(f"❌ FCM Send Error: {e}")
             raise e
+
 
 # יצירת Singleton
 fcm_client = FCMClient()

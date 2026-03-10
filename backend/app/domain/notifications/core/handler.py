@@ -14,11 +14,15 @@ from app.domain.notifications.config.mappings import NOTIFICATION_STRATEGY
 from app.domain.notifications.config.templates_map.email_conf import EMAIL_MAP
 from app.domain.notifications.config.templates_map.push_conf import PUSH_TEMPLATES
 from app.domain.notifications.core.resolver import recipient_resolver
-from app.domain.notifications.manager import notification_manager, NotificationCommand # הוספנו את ה-Schema
+from app.domain.notifications.manager import (
+    notification_manager,
+    NotificationCommand,
+)  # הוספנו את ה-Schema
 from app.domain.notifications.constants import NotificationEvent
 from app.core.exceptions.base import LinkupError
 
 logger = logging.getLogger(__name__)
+
 
 class NotificationHandler:
     async def handle_event(self, db: AsyncSession, event_name: str, payload: dict):
@@ -27,12 +31,18 @@ class NotificationHandler:
         מעודכן לשימוש ב-NotificationCommand.
         """
         try:
-            logger.info("[NOTIF] Handler: start event=%s payload_keys=%s", event_name, list(payload.keys()) if isinstance(payload, dict) else "?")
+            logger.info(
+                "[NOTIF] Handler: start event=%s payload_keys=%s",
+                event_name,
+                list(payload.keys()) if isinstance(payload, dict) else "?",
+            )
             # 1. ולידציה והמרה ל-Enum
             try:
                 event_key = NotificationEvent(event_name)
             except ValueError:
-                logger.warning("[NOTIF] Handler: event '%s' not registered. Skipping.", event_name)
+                logger.warning(
+                    "[NOTIF] Handler: event '%s' not registered. Skipping.", event_name
+                )
                 return
 
             # 2. שליפת האסטרטגיה המתאימה (The Blueprint)
@@ -50,7 +60,10 @@ class NotificationHandler:
                     payload,
                 )
                 return
-            logger.info("[NOTIF] Handler: source_data loaded (booking_id=%s)", getattr(source_data, "booking_id", payload.get("booking_id")))
+            logger.info(
+                "[NOTIF] Handler: source_data loaded (booking_id=%s)",
+                getattr(source_data, "booking_id", payload.get("booking_id")),
+            )
 
             # 4. Resolve - זיהוי הנמען (מי המשתמש שיקבל את המייל/פוש)
             # ride.created_for_passengers / ride.cancelled_by_driver: הנמען לפי passenger_id ב-payload
@@ -63,7 +76,9 @@ class NotificationHandler:
                 resolved = recipient_resolver.resolve(event_key, source_data)
             logger.info(
                 "[NOTIF] Handler: recipient user_id=%s email=%s",
-                getattr(resolved, "user_id", getattr(resolved, "id", None)) if resolved else None,
+                getattr(resolved, "user_id", getattr(resolved, "id", None))
+                if resolved
+                else None,
                 getattr(resolved, "email", None) if resolved else None,
             )
 
@@ -96,29 +111,55 @@ class NotificationHandler:
                 or (data.get("user_name") if data else None)
                 or context.get("first_name", "")
             )
-            if event_key.value in ("auth.email_verification", "email_verification") and not context.get("code") and not context.get("token"):
-                logger.warning("⚠️ Email verification event without code/token in payload. Keys: %s", list(payload.keys()))
+            if (
+                event_key.value in ("auth.email_verification", "email_verification")
+                and not context.get("code")
+                and not context.get("token")
+            ):
+                logger.warning(
+                    "⚠️ Email verification event without code/token in payload. Keys: %s",
+                    list(payload.keys()),
+                )
 
             # אימות מייל: אם מוגדר API_PUBLIC_URL – כפתור במייל יפתח לינק אימות בלחיצה אחת
             # (רק אם role != "both", כי אז נטפל בנפרד)
-            if event_key.value in ("auth.email_verification", "email_verification") and context.get("code") and not isinstance(resolved, dict):
+            if (
+                event_key.value in ("auth.email_verification", "email_verification")
+                and context.get("code")
+                and not isinstance(resolved, dict)
+            ):
                 try:
                     from app.core.config import settings
-                    api_base = (getattr(settings, "API_PUBLIC_URL", None) or "").rstrip("/")
+
+                    api_base = (getattr(settings, "API_PUBLIC_URL", None) or "").rstrip(
+                        "/"
+                    )
                     if api_base:
                         user = resolved
-                        email_for_link = getattr(user, "email", None) if user else data.get("email", "")
+                        email_for_link = (
+                            getattr(user, "email", None)
+                            if user
+                            else data.get("email", "")
+                        )
                         if email_for_link:
-                            context["action_url"] = f"{api_base}/api/v1/auth/verify-email/confirm?email={quote(email_for_link)}&code={quote(str(context['code']))}"
+                            context["action_url"] = (
+                                f"{api_base}/api/v1/auth/verify-email/confirm?email={quote(email_for_link)}&code={quote(str(context['code']))}"
+                            )
                 except Exception:
                     pass
 
             # 6. Resolve template path & copy from EMAIL_MAP / PUSH_TEMPLATES
             template_key = strategy["template"]
             email_conf = EMAIL_MAP.get(template_key)
-            push_conf = PUSH_TEMPLATES.get(template_key) if "push" in strategy.get("channels", []) else None
+            push_conf = (
+                PUSH_TEMPLATES.get(template_key)
+                if "push" in strategy.get("channels", [])
+                else None
+            )
             if email_conf:
-                context["subject"] = context.get("subject") or email_conf.get("subject", "Update from Linkup")
+                context["subject"] = context.get("subject") or email_conf.get(
+                    "subject", "Update from Linkup"
+                )
             if push_conf:
                 context["push_title"] = push_conf.get("title", "")
                 context["push_body"] = push_conf.get("body", "")
@@ -126,33 +167,48 @@ class NotificationHandler:
 
             # 7. Dispatch - בניית הפקודה ושליחה ל-Manager
             # אם role="both", נשלח לשני משתמשים
-            if isinstance(resolved, dict) and "user_id_1" in resolved and "user_id_2" in resolved:
+            if (
+                isinstance(resolved, dict)
+                and "user_id_1" in resolved
+                and "user_id_2" in resolved
+            ):
                 # שליחה לשני משתמשים
                 from app.domain.users.crud import crud_user
+
                 user1 = await crud_user.get(db, id=resolved["user_id_1"])
                 user2 = await crud_user.get(db, id=resolved["user_id_2"])
-                
+
                 if user1:
                     command1 = NotificationCommand(
                         event_key=event_key.value,
                         user=user1,
                         template=template_path,
                         channels=strategy.get("channels", ["email"]),
-                        context={**context, "user_name": getattr(user1, "full_name", "") or getattr(user1, "first_name", "")},
+                        context={
+                            **context,
+                            "user_name": getattr(user1, "full_name", "")
+                            or getattr(user1, "first_name", ""),
+                        },
                     )
                     await notification_manager.process_and_send(command1)
-                
+
                 if user2:
                     command2 = NotificationCommand(
                         event_key=event_key.value,
                         user=user2,
                         template=template_path,
                         channels=strategy.get("channels", ["email"]),
-                        context={**context, "user_name": getattr(user2, "full_name", "") or getattr(user2, "first_name", "")},
+                        context={
+                            **context,
+                            "user_name": getattr(user2, "full_name", "")
+                            or getattr(user2, "first_name", ""),
+                        },
                     )
                     await notification_manager.process_and_send(command2)
-                
-                logger.info(f"✅ Notification dispatched to both users: {event_key} -> user_id_1={resolved['user_id_1']}, user_id_2={resolved['user_id_2']}")
+
+                logger.info(
+                    f"✅ Notification dispatched to both users: {event_key} -> user_id_1={resolved['user_id_1']}, user_id_2={resolved['user_id_2']}"
+                )
             else:
                 # שליחה למשתמש אחד (התנהגות רגילה)
                 user = resolved
@@ -177,15 +233,28 @@ class NotificationHandler:
                     channels=strategy.get("channels", ["email"]),
                     context=context,
                 )
-                logger.info("[NOTIF] Handler: dispatching to manager event=%s user_id=%s", event_key.value, getattr(user, "user_id", None))
+                logger.info(
+                    "[NOTIF] Handler: dispatching to manager event=%s user_id=%s",
+                    event_key.value,
+                    getattr(user, "user_id", None),
+                )
                 await notification_manager.process_and_send(command)
-                logger.info("[NOTIF] Handler: done event=%s -> %s", event_key.value, getattr(user, "email", "?"))
+                logger.info(
+                    "[NOTIF] Handler: done event=%s -> %s",
+                    event_key.value,
+                    getattr(user, "email", "?"),
+                )
 
         except Exception as e:
-            logger.error(f"❌ NotificationHandler Error [{event_name}]: {str(e)}", exc_info=True)
+            logger.error(
+                f"❌ NotificationHandler Error [{event_name}]: {str(e)}", exc_info=True
+            )
             # When source_data is missing (e.g. stale message, booking_id not in DB), skip and ack – don't requeue
             if "Could not hydrate source data" in str(e):
-                logger.warning("[NOTIF] Handler: skipping and acking message (stale/missing data) event=%s", event_name)
+                logger.warning(
+                    "[NOTIF] Handler: skipping and acking message (stale/missing data) event=%s",
+                    event_name,
+                )
                 return
             raise LinkupError(f"Notification System Failure: {str(e)}") from e
 
@@ -195,9 +264,13 @@ class NotificationHandler:
         עבור chat.conversation.completed, מחזיר את ה-payload עצמו (מכיל user_id_1, user_id_2).
         """
         # עבור chat events, נחזיר את ה-payload עצמו (ה-builder יקבל אותו)
-        if payload.get("conversation_id") and payload.get("user_id_1") and payload.get("user_id_2"):
+        if (
+            payload.get("conversation_id")
+            and payload.get("user_id_1")
+            and payload.get("user_id_2")
+        ):
             return payload
-        
+
         booking_id = payload.get("booking_id")
         ride_id = payload.get("ride_id")
         user_id = payload.get("user_id")
@@ -212,7 +285,9 @@ class NotificationHandler:
                 logger.info("[NOTIF] Handler: fetching booking_id=%s from DB", bid)
                 booking = await crud_booking.get(db, id=bid)
                 if not booking:
-                    logger.warning("[NOTIF] Handler: no booking found for booking_id=%s", bid)
+                    logger.warning(
+                        "[NOTIF] Handler: no booking found for booking_id=%s", bid
+                    )
                 return booking
         if ride_id:
             return await crud_ride.get_for_notification(db, ride_id)
@@ -220,8 +295,9 @@ class NotificationHandler:
             return await crud_passenger.get(db, id=passenger_id)
         if user_id:
             return await crud_user.get(db, id=user_id)
-            
-        return payload 
+
+        return payload
+
 
 # Instance יחיד לשימוש בוורקר
 notification_handler = NotificationHandler()
@@ -251,10 +327,10 @@ notification_handler = NotificationHandler()
 #     Channel: WebSocket
 #     אחריות: שידור עדכונים חיים לממשק המשתמש כחלק ממערך ההתראות של האפליקציה.
 #     """
-    
+
 #     @staticmethod
 #     async def send_ride_status_update(
-#         ride_id: int, 
+#         ride_id: int,
 #         publish_func: Callable[[int, dict], Coroutine[Any, Any, None]],
 #         event_type: str = "RIDE_CREATED"
 #     ):
@@ -268,7 +344,7 @@ notification_handler = NotificationHandler()
 #             "color": "green",
 #             "message": "הנסיעה פורסמה בהצלחה"
 #         }
-        
+
 #         await publish_func(ride_id, payload)
 
 # # Singleton

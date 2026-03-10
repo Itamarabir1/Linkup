@@ -4,23 +4,32 @@ from app.domain.passengers.enum import PassengerStatus
 from app.core.utils.validators import validate_future_datetime
 from fastapi import Query
 from typing import Optional, List
-from app.domain.passengers.model import PassengerRequest
 from app.domain.rides.schema import RideResponse
 
 # --- 1. סכמות בסיס ליצירת בקשה ---
 
+
 class Passenger(BaseModel):
     """השרת ממלא passenger_id מהמשתמש המחובר – לא מהגוף."""
-    passenger_id: Optional[int] = Field(None, description="ממולא בשרת מהטוקן; התעלם בקליינט")
+
+    passenger_id: Optional[int] = Field(
+        None, description="ממולא בשרת מהטוקן; התעלם בקליינט"
+    )
     num_passengers: int = Field(default=1, ge=1)
-    pickup_name: str = Field(..., min_length=1, description="שם מקום איסוף (טקסט או ממיקום נוכחי)")
+    pickup_name: str = Field(
+        ..., min_length=1, description="שם מקום איסוף (טקסט או ממיקום נוכחי)"
+    )
     destination_name: str = Field(..., min_length=1)
     requested_departure_time: Optional[datetime] = Field(
         None,
         description="אופציונלי – אם ריק יחפש 'מעכשיו'",
     )
-    search_radius: int = Field(default=1000, ge=100, description="רדיוס חיפוש במטרים (אחיד עם חיפוש)")
-    is_notification_active: bool = Field(default=True, description="התראות מייל ופוש לבקשה זו")
+    search_radius: int = Field(
+        default=1000, ge=100, description="רדיוס חיפוש במטרים (אחיד עם חיפוש)"
+    )
+    is_notification_active: bool = Field(
+        default=True, description="התראות מייל ופוש לבקשה זו"
+    )
     pickup_lat: Optional[float] = Field(None, ge=-90, le=90)
     pickup_lon: Optional[float] = Field(None, ge=-180, le=180)
 
@@ -37,11 +46,16 @@ class Passenger(BaseModel):
             raise ValueError("pickup_lat ו-pickup_lon חייבים להישלח יחד")
         return self
 
+
 class PassengerRequestCreate(Passenger):
-    is_auto_generated: bool = Field(default=False, description="האם נוצר מחיפוש אוטומטי")
+    is_auto_generated: bool = Field(
+        default=False, description="האם נוצר מחיפוש אוטומטי"
+    )
+
 
 class PassengerRequestResponse(BaseModel):
     """נתוני הבקשה הבסיסיים כפי שנשמרו ב-DB"""
+
     request_id: int
     passenger_id: int
     num_passengers: int
@@ -52,33 +66,46 @@ class PassengerRequestResponse(BaseModel):
     created_at: datetime
     booking_id: Optional[int] = None
     # מחזירים את מצב הכפתור בתשובה מהשרת
-    is_notification_active: bool 
+    is_notification_active: bool
 
     model_config = ConfigDict(from_attributes=True)
 
+
 # --- הוספה חדשה: תשובה הכוללת התאמות מיידיות ---
+
 
 class PassengerRequestWithMatches(PassengerRequestResponse):
     """
     הסכמה הזו מחזירה גם את נתוני הבקשה וגם את הנהגים שנמצאו באותו רגע.
     יורשת אוטומטית את is_notification_active מ-PassengerRequestResponse.
     """
-    matching_rides: List[RideResponse] = Field(default=[], description="רשימת נהגים רלוונטיים שנמצאו מיד")
+
+    matching_rides: List[RideResponse] = Field(
+        default=[], description="רשימת נהגים רלוונטיים שנמצאו מיד"
+    )
+
 
 # --- 2. סכמות לעדכון (Partial Update) ---
 
+
 class PassengerRequestUpdateNotifications(BaseModel):
     """סכימה ייעודית לשינוי מצב הכפתור בלבד"""
+
     is_notification_active: bool
+
 
 # --- 3. סכמות לחיפוש (Request Parameters) ---
 
+
 class RideSearchRequest(BaseModel):
     """סכמת קלט לחיפוש; passenger_id ממולא בשרת אם יש auth (אופציונלי)."""
+
     passenger_id: Optional[int] = Field(None, description="ממולא בשרת כשמשתמש מחובר")
     pickup_name: str = Field(..., min_length=2)
     destination_name: str = Field(..., min_length=2)
-    search_radius: int = Field(default=1000, ge=100, description="רדיוס חיפוש במטרים (אחיד)")
+    search_radius: int = Field(
+        default=1000, ge=100, description="רדיוס חיפוש במטרים (אחיד)"
+    )
     departure_time: Optional[datetime] = Field(
         None,
         description="מתי הנוסע צריך לצאת (אם ריק – יחפש מעכשיו)",
@@ -87,12 +114,16 @@ class RideSearchRequest(BaseModel):
 
 class RideSearchResponse(BaseModel):
     """תשובת חיפוש נסיעות - כוללת נסיעות ו-request_id אם נוצרה בקשה."""
+
     rides: List[RideResponse] = Field(default=[], description="רשימת נסיעות שנמצאו")
-    request_id: Optional[int] = Field(None, description="מזהה הבקשה שנוצרה (אם המשתמש מחובר)")
+    request_id: Optional[int] = Field(
+        None, description="מזהה הבקשה שנוצרה (אם המשתמש מחובר)"
+    )
 
 
 class RequestRideFromSearch(BaseModel):
     """בקשת הצטרפות לנסיעה מתוך תוצאות חיפוש."""
+
     ride_id: int
     request_id: Optional[int] = Field(None, description="מזהה הבקשה מהחיפוש (אם קיים)")
     pickup_name: str = Field(..., min_length=1)

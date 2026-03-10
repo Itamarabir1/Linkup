@@ -2,6 +2,7 @@
 ראוטר גיאו משותף – מקור אמת יחיד למיקום נוכחי (reverse geocode).
 נהג ונוסע קוראים ל־GET /geo/address כשהמשתמש לוחץ "השתמש במיקום שלי".
 """
+
 from fastapi import APIRouter, Query, Depends
 
 from app.core.config import settings

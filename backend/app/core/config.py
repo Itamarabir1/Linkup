@@ -7,13 +7,14 @@ from typing import Optional, Dict, Any, List
 # תיקיית backend (היכן ש-.env נמצא) – כך שה-.env נטען גם כשמריצים מ-cwd אחר
 _BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
 
+
 class Settings(BaseSettings):
     """
     LinkUp System Settings - Architect Edition (2026).
     ניהול ריכוזי של כל משתני הסביבה עם וולידציה בזמן עלייה.
     מעודכן לתמיכה ב-Kafka KRaft וארכיטקטורת אירועים מלאה.
     """
-    
+
     # --- Project Metadata ---
     PROJECT_NAME: str = "LinkUp"
     APP_NAME: str = "linkup-backend"
@@ -107,7 +108,7 @@ class Settings(BaseSettings):
 
     # --- Kafka (KRaft Mode - No Zookeeper) ---
     KAFKA_BOOTSTRAP_SERVERS: str = Field("localhost:9092")
-    
+
     # Topics
     KAFKA_TOPIC_RIDES: str = Field("rides_stream")
     KAFKA_TOPIC_NOTIFICATIONS: str = Field("user_notifications")
@@ -141,8 +142,10 @@ class Settings(BaseSettings):
 
     # --- EIA (U.S. fuel prices API) ---
     # Get free API key: https://www.eia.gov/opendata/register.php
-    EIA_API_KEY: str = Field("", description="EIA Open Data API key for fuel price scanner")
-    
+    EIA_API_KEY: str = Field(
+        "", description="EIA Open Data API key for fuel price scanner"
+    )
+
     # --- Google Maps Geocoding API ---
     GOOGLE_MAPS_API_KEY: str = Field(
         "",
@@ -160,10 +163,15 @@ class Settings(BaseSettings):
     )
 
     # --- Security & Auth (חובה בפרודקשן – בפיתוח ברירת מחדל) ---
-    SECRET_KEY: str = Field("dev-secret-key-change-in-production", description="Must be set in .env for production")
+    SECRET_KEY: str = Field(
+        "dev-secret-key-change-in-production",
+        description="Must be set in .env for production",
+    )
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(30, description="תוקף Access Token בדקות")
-    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(7, description="תוקף Refresh Token בימים (לטוקן הארוך)")
+    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(
+        7, description="תוקף Refresh Token בימים (לטוקן הארוך)"
+    )
     JWT_ISSUER: str = Field("linkup-api", description="JWT claim 'iss' (issuer)")
 
     # --- HTTPS (פרודקשן מאחורי Proxy) ---
@@ -179,8 +187,12 @@ class Settings(BaseSettings):
     )
 
     # --- Rate limiting (auth endpoints) ---
-    RATE_LIMIT_AUTH_WINDOW_SECONDS: int = Field(60, description="חלון זמן ל-rate limit על auth (שניות)")
-    RATE_LIMIT_AUTH_MAX_REQUESTS: int = Field(10, description="מקסימום בקשות ל-auth ל-IP בחלון")
+    RATE_LIMIT_AUTH_WINDOW_SECONDS: int = Field(
+        60, description="חלון זמן ל-rate limit על auth (שניות)"
+    )
+    RATE_LIMIT_AUTH_MAX_REQUESTS: int = Field(
+        10, description="מקסימום בקשות ל-auth ל-IP בחלון"
+    )
 
     # --- Cloud Infrastructure (AWS & Firebase) – אופציונלי בפיתוח ---
     AWS_ACCESS_KEY_ID: str = Field("")
@@ -195,19 +207,25 @@ class Settings(BaseSettings):
         description="Optional directory for upload temp files; default is system temp.",
     )
 
-    FIREBASE_SERVICE_ACCOUNT_PATH: str = Field("", description="Path to Firebase JSON (optional for local dev)")
-    FIREBASE_CREDENTIALS_JSON: Optional[str] = Field(None, description="Firebase credentials as JSON string (production)")
+    FIREBASE_SERVICE_ACCOUNT_PATH: str = Field(
+        "", description="Path to Firebase JSON (optional for local dev)"
+    )
+    FIREBASE_CREDENTIALS_JSON: Optional[str] = Field(
+        None, description="Firebase credentials as JSON string (production)"
+    )
 
     # --- Pydantic Configuration ---
     model_config = SettingsConfigDict(
         env_file=str(_BACKEND_DIR / ".env"),
         env_file_encoding="utf-8",
         case_sensitive=False,
-        extra="ignore"
+        extra="ignore",
     )
+
 
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()
+
 
 settings = get_settings()

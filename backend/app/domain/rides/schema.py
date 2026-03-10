@@ -4,18 +4,16 @@ from typing import List, Any, Dict, Optional
 from app.domain.rides.enum import RideStatus
 from app.core.utils.validators import validate_future_datetime
 from uuid import uuid4
-from pydantic import BaseModel, Field, field_validator, ConfigDict
-from datetime import datetime
-from typing import List, Any, Dict, Optional
-from app.domain.rides.enum import RideStatus
+
 # שים לב לתיקון הנתיב אם צריך - שמרתי על המקור שלך
-from app.core.utils.validators import validate_future_datetime
 from app.domain.geo.schema import RouteOptionData
 # --- 0. אובייקטי עזר (Reusable Mixins) ---
+
 
 class LocationMixin(BaseModel):
     origin_name: str = Field(..., min_length=2)
     destination_name: str = Field(..., min_length=2)
+
 
 class CoordinatesMixin(BaseModel):
     origin_lat: float
@@ -23,12 +21,17 @@ class CoordinatesMixin(BaseModel):
     dest_lat: float
     dest_lon: float
 
+
 # --- 1. סכמות לקלט (Requests) ---
+
 
 class RidePreviewCreate(BaseModel):
     """יצירת תצוגה מקדימה לנסיעה. מוצא: טקסט (origin_name) או מיקום נוכחי (origin_lat/origin_lon) – כמו אצל נוסע."""
+
     driver_id: int
-    origin_name: Optional[str] = None  # טקסט או ריק כשנשלחים origin_lat/origin_lon (מיקום נוכחי)
+    origin_name: Optional[str] = (
+        None  # טקסט או ריק כשנשלחים origin_lat/origin_lon (מיקום נוכחי)
+    )
     destination_name: str
     departure_time: datetime
     available_seats: int = Field(default=4, ge=1)
@@ -36,10 +39,11 @@ class RidePreviewCreate(BaseModel):
     origin_lat: Optional[float] = Field(None, ge=-90, le=90)
     origin_lon: Optional[float] = Field(None, ge=-180, le=180)
 
-    @field_validator('departure_time')
+    @field_validator("departure_time")
     @classmethod
     def time_validation(cls, v: datetime) -> datetime:
         return validate_future_datetime(v)
+
 
 class RideCreate(BaseModel):
     session_id: str
@@ -48,6 +52,7 @@ class RideCreate(BaseModel):
 
 class RideUpdate(BaseModel):
     """עדכון חלקי לנסיעה – רק זמן יציאה ומספר מושבים (כל השדות אופציונליים)."""
+
     departure_time: Optional[datetime] = None
     available_seats: Optional[int] = Field(None, ge=1)
 
@@ -61,25 +66,27 @@ class RideUpdate(BaseModel):
 
 # --- 2. סכמות לתצוגה מקדימה (Preview) ---
 
+
 class RouteOption(BaseModel):
     route_index: int
     summary: str
     duration_min: float
     distance_km: float
-    coords: List[List[float]] 
+    coords: List[List[float]]
+
 
 class RidePreviewResponse(LocationMixin):
     session_id: str
-    origin_coords: List[float] # [lat, lon]
+    origin_coords: List[float]  # [lat, lon]
     destination_coords: List[float]
     routes: List[RouteOption]
 
     @classmethod
     def from_processor(
-        cls, 
-        geo_data: Dict[str, Any], 
-        preview_in: "RidePreviewCreate", 
-        origin_address: str
+        cls,
+        geo_data: Dict[str, Any],
+        preview_in: "RidePreviewCreate",
+        origin_address: str,
     ) -> "RidePreviewResponse":
         """
         Factory Method מקצועית.
@@ -98,7 +105,7 @@ class RidePreviewResponse(LocationMixin):
             for i, r in enumerate(routes_data)
         ]
         return cls(
-            session_id=str(uuid4()), # היצירה עברה לכאן!
+            session_id=str(uuid4()),  # היצירה עברה לכאן!
             origin_name=origin_address,
             destination_name=preview_in.destination_name,
             origin_coords=[geo_data["origin"].lat, geo_data["origin"].lon],
@@ -106,10 +113,13 @@ class RidePreviewResponse(LocationMixin):
             routes=routes,
         )
 
+
 # --- 3. הליבה (Internal & DB Contract) ---
+
 
 class RideBase(LocationMixin):
     """בסיס לנסיעה – בלי וולידציית 'זמן עתידי' (תשובות מה-DB כוללות נסיעות בעבר)."""
+
     driver_id: int
     departure_time: datetime
     estimated_arrival_time: datetime
@@ -119,35 +129,41 @@ class RideBase(LocationMixin):
 
 class RideCreateInternal(RideBase, CoordinatesMixin):
     """הסכימה הסופית שעוברת ל-CRUD – וולידציית זמן עתידי רק ביצירה."""
+
     route_coords: List[List[float]]
     total_distance_km: float
     total_duration_min: float
     status: RideStatus = RideStatus.OPEN
 
-    @field_validator('departure_time', 'estimated_arrival_time')
+    @field_validator("departure_time", "estimated_arrival_time")
     @classmethod
     def validate_times_future(cls, v: datetime) -> datetime:
         return validate_future_datetime(v)
 
     model_config = ConfigDict(from_attributes=True)
 
+
 # --- 4. תגובות (Responses) ---
+
 
 class RideResponse(RideBase):
     """מחזיר נסיעה מלאה מה-DB"""
+
     ride_id: int
     status: RideStatus
     created_at: datetime
     total_distance_km: float = Field(..., validation_alias="distance_km")
     total_duration_min: float = Field(..., validation_alias="duration_min")
     # שימוש ב-Alias כדי למשוך מה-Property של SQLAlchemy
-    route_coords: List[List[float]] = Field(..., validation_alias='route_coords_list')
+    route_coords: List[List[float]] = Field(..., validation_alias="route_coords_list")
     route_summary: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
+
 class RideSearchResponse(BaseModel):
     """תצוגה מקוצרת לחיפוש"""
+
     ride_id: int
     origin_name: str
     destination_name: str
@@ -159,8 +175,6 @@ class RideSearchResponse(BaseModel):
 
 class DriverInfoResponse(BaseModel):
     """פרטי נהג לתצוגה (לנוסע) – רק כשהנוסע לוחץ 'הצג פרטי הנהג'."""
+
     full_name: str
     phone_number: Optional[str] = None
-
-
-

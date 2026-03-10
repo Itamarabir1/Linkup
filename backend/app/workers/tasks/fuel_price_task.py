@@ -2,6 +2,7 @@
 סורק מחירי דלק (EIA US) – מופעל מהתור המתוזמן.
 כרגע בלי שמירה: רק מריץ את הלוגיקה/קריאת API; לא שומר ל־DB או Redis.
 """
+
 import logging
 from app.core.config import settings
 

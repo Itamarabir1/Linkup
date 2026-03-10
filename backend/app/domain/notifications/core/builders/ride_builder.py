@@ -1,6 +1,7 @@
 from typing import Any, Dict
 from .base import BaseContextBuilder
 
+
 class RideBuilder(BaseContextBuilder):
     """
     Senior Implementation: Uses declarative mapping instead of imperative if/else.
@@ -12,7 +13,7 @@ class RideBuilder(BaseContextBuilder):
         origin = getattr(ride, "origin_name", "N/A")
         destination = getattr(ride, "destination_name", "N/A")
         ride_date = self._format_date(getattr(ride, "departure_time", None))
-        
+
         ride_id = getattr(ride, "ride_id", None) or getattr(ride, "id", "")
         context = {
             "ride_id": ride_id,
@@ -37,22 +38,26 @@ class RideBuilder(BaseContextBuilder):
                 "subject": "עדכון חשוב: הנסיעה בוטלה",
                 "hero_text": "הנסיעה בוטלה",
                 "description": f"מצטערים, הנסיעה מ{origin} ל{destination} בוטלה על ידי {driver_name}.",
-                "cta_label": "חפש נסיעה חלופית"
+                "cta_label": "חפש נסיעה חלופית",
             },
             "reminder": {
                 "subject": "תזכורת: הנסיעה שלך מתקרבת!",
                 "hero_text": "יוצאים לדרך בקרוב",
                 "description": f"תזכורת: הנסיעה מ{origin} מחכה לך ב-{ride_date}.",
-                "cta_label": "צפה בפרטי הנסיעה"
-            }
+                "cta_label": "צפה בפרטי הנסיעה",
+            },
         }
 
         # 3. חילוץ התוכן המתאים או שימוש בברירת מחדל
         # אנחנו מחפשים מילת מפתח בתוך ה-event_key (כמו cancelled או reminder)
         event_key_lower = (event_key or "").lower()
         matched_content = next(
-            (content for key, content in event_content_map.items() if key in event_key_lower),
-            self._get_default_content()
+            (
+                content
+                for key, content in event_content_map.items()
+                if key in event_key_lower
+            ),
+            self._get_default_content(),
         )
 
         return {**context, **matched_content}
@@ -62,5 +67,5 @@ class RideBuilder(BaseContextBuilder):
             "subject": "עדכון לגבי נסיעה ב-Linkup",
             "hero_text": "עדכון נסיעה",
             "description": "חלו שינויים בפרטי הנסיעה שלך.",
-            "cta_label": "לפרטים נוספים"
+            "cta_label": "לפרטים נוספים",
         }

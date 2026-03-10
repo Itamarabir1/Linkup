@@ -16,6 +16,7 @@ class RideNotificationFactory:
     Utility Class האחראי על פורמט ההודעות לכל ערוצי ההפצה (WebSocket, Push, וכו').
     מרכז את כל ה"צבעים" והטקסטים במקום אחד. צבע יצירה = ירוק (נסיעה חדשה).
     """
+
     # מפת קונפיגורציה: RideBroadcastAction (שידור) + RideStatus (ביטול/השלמה)
     _CONFIG = {
         RideBroadcastAction.CREATED.value: {
@@ -43,15 +44,20 @@ class RideNotificationFactory:
     @classmethod
     def create_broadcast_payload(cls, ride, action: str) -> Dict[str, Any]:
         """מייצר Payload אחיד לשידור WebSocket (event, ride_id, status, color, message)."""
-        config = cls._CONFIG.get(action, {
-            "color": "gray",
-            "message": "עדכון בנסיעה",
-            "event_prefix": "RIDE_UPDATED",
-        })
+        config = cls._CONFIG.get(
+            action,
+            {
+                "color": "gray",
+                "message": "עדכון בנסיעה",
+                "event_prefix": "RIDE_UPDATED",
+            },
+        )
         return {
             "event": config["event_prefix"],
             "ride_id": ride.ride_id,
-            "status": ride.status.value if hasattr(ride.status, "value") else str(ride.status),
+            "status": ride.status.value
+            if hasattr(ride.status, "value")
+            else str(ride.status),
             "color": config["color"],
             "message": f"{config['message']} (מ-{ride.origin_name} ל-{ride.destination_name})",
         }
@@ -60,5 +66,7 @@ class RideNotificationFactory:
 async def publish_ride_update(ride_id: int, message_data: dict) -> None:
     """פרסום עדכונים לערוץ ה-Realtime של הנסיעה (WebSocket)."""
     channel_name = f"ride_{ride_id}"
-    payload = json.dumps(message_data) if isinstance(message_data, dict) else message_data
+    payload = (
+        json.dumps(message_data) if isinstance(message_data, dict) else message_data
+    )
     await broadcast.publish(channel_name, payload)

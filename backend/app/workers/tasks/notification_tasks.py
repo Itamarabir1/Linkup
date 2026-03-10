@@ -5,11 +5,12 @@ from app.domain.notifications.core.handler import notification_handler
 from app.domain.notifications.services.reminder_scheduler import reminder_scheduler
 from app.domain.rides.crud import crud_ride
 from app.domain.passengers.crud import crud_passenger
-from app.domain.bookings.crud import crud_booking
 from app.domain.bookings.enum import BookingStatus
 from app.domain.bookings.model import Booking
 
-from app.domain.notifications.constants import NotificationEvent  # re-export for backward compatibility
+from app.domain.notifications.constants import (
+    NotificationEvent,
+)  # re-export for backward compatibility
 
 logger = logging.getLogger(__name__)
 
@@ -28,16 +29,23 @@ async def handle_ride_created(db, data: Dict[str, Any]) -> None:
         if not ride:
             logger.warning("ride.created: ride_id=%s not found", ride_id)
             return []
-        
+
         # בדיקה שהנסיעה נטענה נכון
-        logger.info("ride.created: processing ride_id=%s, driver_id=%s, origin=%s, dest=%s, route_coords=%s", 
-                   ride_id, getattr(ride, "driver_id", None), 
-                   getattr(ride, "origin_name", None), 
-                   getattr(ride, "destination_name", None),
-                   "exists" if getattr(ride, "route_coords", None) else "missing")
-        
+        logger.info(
+            "ride.created: processing ride_id=%s, driver_id=%s, origin=%s, dest=%s, route_coords=%s",
+            ride_id,
+            getattr(ride, "driver_id", None),
+            getattr(ride, "origin_name", None),
+            getattr(ride, "destination_name", None),
+            "exists" if getattr(ride, "route_coords", None) else "missing",
+        )
+
         passengers = crud_passenger.find_passengers_for_ride_notification(sess, ride)
-        logger.info("ride.created: found %d matching passengers for ride_id=%s", len(passengers), ride_id)
+        logger.info(
+            "ride.created: found %d matching passengers for ride_id=%s",
+            len(passengers),
+            ride_id,
+        )
         return passengers
 
     passengers = await db.run_sync(_find_passengers)
@@ -49,8 +57,16 @@ async def handle_ride_created(db, data: Dict[str, Any]) -> None:
                 payload={"ride_id": ride_id, "passenger_id": pr.passenger_id},
             )
         except Exception as e:
-            logger.warning("Failed to send ride.created_for_passengers to passenger %s: %s", pr.passenger_id, e)
-    logger.info("ride.created: sent %d passenger notifications for ride_id=%s", len(passengers), ride_id)
+            logger.warning(
+                "Failed to send ride.created_for_passengers to passenger %s: %s",
+                pr.passenger_id,
+                e,
+            )
+    logger.info(
+        "ride.created: sent %d passenger notifications for ride_id=%s",
+        len(passengers),
+        ride_id,
+    )
 
 
 async def handle_ride_cancelled_by_driver(db, data: Dict[str, Any]) -> None:
@@ -65,23 +81,29 @@ async def handle_ride_cancelled_by_driver(db, data: Dict[str, Any]) -> None:
     def _find_bookings(sess):
         # מחפש את כל ה-bookings של הנסיעה (כולל CANCELLED, CONFIRMED, PENDING)
         # כדי לשלוח התראה לכל הנוסעים שהיו מחוברים לנסיעה
-        return sess.query(Booking).filter(
-            Booking.ride_id == ride_id
-        ).all()
+        return sess.query(Booking).filter(Booking.ride_id == ride_id).all()
 
     bookings = await db.run_sync(_find_bookings)
-    
+
     # מסנן רק bookings שהיו פעילים (CONFIRMED או PENDING) לפני הביטול
     # או CANCELLED (כי אחרי הביטול כל ה-bookings מקבלים סטטוס CANCELLED)
     active_bookings = [
-        b for b in bookings 
-        if b.status in (BookingStatus.CANCELLED.value, BookingStatus.CONFIRMED.value, BookingStatus.PENDING.value)
+        b
+        for b in bookings
+        if b.status
+        in (
+            BookingStatus.CANCELLED.value,
+            BookingStatus.CONFIRMED.value,
+            BookingStatus.PENDING.value,
+        )
     ]
-    
+
     if not active_bookings:
-        logger.warning("ride.cancelled_by_driver: no active bookings found for ride_id=%s", ride_id)
+        logger.warning(
+            "ride.cancelled_by_driver: no active bookings found for ride_id=%s", ride_id
+        )
         return
-    
+
     for b in active_bookings:
         try:
             await notification_handler.handle_event(
@@ -102,12 +124,18 @@ async def handle_ride_cancelled_by_driver(db, data: Dict[str, Any]) -> None:
     )
 
 
-async def handle_notification_event(data: Dict[str, Any], routing_key: str, handler=notification_handler):
+async def handle_notification_event(
+    data: Dict[str, Any], routing_key: str, handler=notification_handler
+):
     """
     ה-Callback שמופעל ע"י ה-RabbitMQConsumer.
     routing_key הוא השם של האירוע שמגיע מרביט (למשל 'ride.created', 'ride.created_for_passengers')
     """
-    logger.info("[NOTIF] Consumer: handling routing_key=%s booking_id=%s", routing_key, data.get("booking_id") if isinstance(data, dict) else "?")
+    logger.info(
+        "[NOTIF] Consumer: handling routing_key=%s booking_id=%s",
+        routing_key,
+        data.get("booking_id") if isinstance(data, dict) else "?",
+    )
     async with SessionLocal() as db:
         try:
             if routing_key == "ride.created":
@@ -117,11 +145,19 @@ async def handle_notification_event(data: Dict[str, Any], routing_key: str, hand
             else:
                 await handler.handle_event(db, event_name=routing_key, payload=data)
             await db.commit()
-            logger.info("[NOTIF] Consumer: handler done for routing_key=%s", routing_key)
+            logger.info(
+                "[NOTIF] Consumer: handler done for routing_key=%s", routing_key
+            )
         except Exception as e:
             await db.rollback()
-            logger.error("[NOTIF] Consumer: ERROR routing_key=%s: %s", routing_key, e, exc_info=True)
+            logger.error(
+                "[NOTIF] Consumer: ERROR routing_key=%s: %s",
+                routing_key,
+                e,
+                exc_info=True,
+            )
             raise
+
 
 async def execute_reminders_job(service=reminder_scheduler):
     """

@@ -23,10 +23,12 @@ from app.infrastructure.geo.utils import get_coords_from_address
 # הגדרת לוגר
 logger = logging.getLogger(__name__)
 
-class PassengerService:
 
+class PassengerService:
     @staticmethod
-    def create_passenger_request(db: Session, request_in: PassengerRequestCreate, passenger_id: int):
+    def create_passenger_request(
+        db: Session, request_in: PassengerRequestCreate, passenger_id: int
+    ):
         """יוצר בקשה (מודעה) ומחפש נהגים תואמים מיד. passenger_id מהטוקן (API)."""
         try:
             if request_in.pickup_lat is not None and request_in.pickup_lon is not None:
@@ -36,7 +38,9 @@ class PassengerService:
             d_lat, d_lon = get_coords_from_address(request_in.destination_name)
 
             if p_lat is None or d_lat is None:
-                raise GeocodingError(address=request_in.pickup_name or request_in.destination_name)
+                raise GeocodingError(
+                    address=request_in.pickup_name or request_in.destination_name
+                )
 
             new_request = crud_passenger.create(
                 db, request_in, p_lat, p_lon, d_lat, d_lon, passenger_id=passenger_id
@@ -56,7 +60,9 @@ class PassengerService:
             raise e
 
     @staticmethod
-    def toggle_request_notifications(db: Session, request_id: int, update_data: PassengerRequestUpdateNotifications):
+    def toggle_request_notifications(
+        db: Session, request_id: int, update_data: PassengerRequestUpdateNotifications
+    ):
         """עדכון כפתור ההתראות (הסוכן החכם) לבקשה ספציפית"""
         p_req = crud_passenger.get_by_id(db, request_id)
         if not p_req:
@@ -80,6 +86,7 @@ class PassengerService:
         # הרשאות: רק בעל הבקשה יכול לבטל
         if p_req.passenger_id != passenger_id:
             from app.core.exceptions.booking import ForbiddenRideActionError
+
             raise ForbiddenRideActionError("גישה חסומה")
 
         # 1. ביטול כל ההזמנות ושחרור מושבים
@@ -99,7 +106,9 @@ class PassengerService:
     ) -> List[PassengerRequestResponse]:
         """רשימת הבקשות שלי כנוסע (הבקשות שלי)."""
         status_enum = PassengerStatus(status) if status else None
-        requests = await crud_passenger.get_by_passenger_id(db, passenger_id, status_enum)
+        requests = await crud_passenger.get_by_passenger_id(
+            db, passenger_id, status_enum
+        )
         return [PassengerRequestResponse.model_validate(r) for r in requests]
 
     @staticmethod
@@ -110,7 +119,7 @@ class PassengerService:
             raise PassengerRequestNotFoundError(request_id=request_id)
 
         try:
-            origin_point = to_shape(p_req.pickup_geom) 
+            origin_point = to_shape(p_req.pickup_geom)
             dest_point = to_shape(p_req.destination_geom)
 
             p_lat, p_lon = origin_point.y, origin_point.x
@@ -119,7 +128,9 @@ class PassengerService:
             logger.error(f"Error parsing coordinates for request {request_id}: {e}")
             raise GeocodingError(address=str(request_id))
 
-        radius = getattr(p_req, "search_radius_meters", None) or getattr(p_req, "search_radius", 1000)
+        radius = getattr(p_req, "search_radius_meters", None) or getattr(
+            p_req, "search_radius", 1000
+        )
         return crud_passenger.find_rides_by_coordinates(
             db, p_lat, p_lon, d_lat, d_lon, radius
         )
@@ -127,20 +138,25 @@ class PassengerService:
     @staticmethod
     def search_rides_for_passenger(db: Session, search_data: RideSearchRequest):
         """חיפוש נסיעות פעיל לפי קואורדינטות של כתובות. אם המשתמש מחובר, יוצר/מעדכן בקשה ב-DB."""
-        from datetime import timezone
-        from app.domain.passengers.schema import RideSearchResponse, PassengerRequestCreate
+        from app.domain.passengers.schema import (
+            RideSearchResponse,
+            PassengerRequestCreate,
+        )
         from app.domain.rides.schema import RideResponse
-        from typing import Union
-        
+
         try:
             p_lat, p_lon = get_coords_from_address(search_data.pickup_name)
             d_lat, d_lon = get_coords_from_address(search_data.destination_name)
 
             if p_lat is None or d_lat is None:
-                raise GeocodingError(address=search_data.pickup_name or search_data.destination_name)
+                raise GeocodingError(
+                    address=search_data.pickup_name or search_data.destination_name
+                )
 
-            radius = getattr(search_data, "search_radius", None) or getattr(search_data, "radius", 1000)
-            
+            radius = getattr(search_data, "search_radius", None) or getattr(
+                search_data, "radius", 1000
+            )
+
             # אם המשתמש מחובר, יצור/עדכן בקשה ב-DB
             request_id = None
             if search_data.passenger_id:
@@ -155,28 +171,36 @@ class PassengerService:
                 )
                 # יצירת בקשה חדשה (תמיד ליצור חדשה לפי העדפת המשתמש)
                 passenger_request = crud_passenger.create(
-                    db, request_in, p_lat, p_lon, d_lat, d_lon, passenger_id=search_data.passenger_id
+                    db,
+                    request_in,
+                    p_lat,
+                    p_lon,
+                    d_lat,
+                    d_lon,
+                    passenger_id=search_data.passenger_id,
                 )
                 request_id = passenger_request.request_id
-            
+
             matches = crud_passenger.find_rides_by_coordinates(
                 db, p_lat, p_lon, d_lat, d_lon, radius
             )
 
             if search_data.departure_time:
-                matches = [r for r in matches if r.departure_time >= search_data.departure_time]
+                matches = [
+                    r for r in matches if r.departure_time >= search_data.departure_time
+                ]
 
             # החזר תמיד RideSearchResponse (עם request_id אם המשתמש מחובר)
             return RideSearchResponse(
                 rides=[RideResponse.model_validate(r) for r in matches],
-                request_id=request_id
+                request_id=request_id,
             )
 
         except Exception as e:
             logger.error(f"Error in search_rides_for_passenger: {e}")
             raise e
 
-    @staticmethod      
+    @staticmethod
     def get_all_rides_for_admin(db: Session, status: str = None):
         """שליפת כל הנסיעות עם פילטר אופציונלי (בתוך ה-Class)"""
         return crud_passenger.get_multi_rides(db, status=status)
@@ -218,4 +242,6 @@ class PassengerService:
             is_notification_active=True,
             is_auto_generated=True,
         )
-        return crud_passenger.create(db, request_in, p_lat, p_lon, d_lat, d_lon, passenger_id=passenger_id)
+        return crud_passenger.create(
+            db, request_in, p_lat, p_lon, d_lat, d_lon, passenger_id=passenger_id
+        )

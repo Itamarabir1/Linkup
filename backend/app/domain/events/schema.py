@@ -2,11 +2,13 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Dict, Any, List, Optional
 from app.domain.events.enum import DispatchTarget
 
+
 class Event(BaseModel):
     """
     Domain Event DTO.
     השפה המשותפת של כל המערכת להעברת אירועים.
     """
+
     name: str = Field(..., example="user.verification_code_created")
     payload: Dict[str, Any] = Field(default_factory=dict)
     targets: List[DispatchTarget] = Field(default_factory=list)
@@ -17,7 +19,9 @@ class Event(BaseModel):
     @classmethod
     def validate_event_name(cls, v: str) -> str:
         if "." not in v:
-            raise ValueError("Event name must follow the 'domain.action' format (e.g., user.created)")
+            raise ValueError(
+                "Event name must follow the 'domain.action' format (e.g., user.created)"
+            )
         return v.lower()
 
     # --- חילוץ נתונים חכם (Properties) ---

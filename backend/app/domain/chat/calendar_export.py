@@ -1,8 +1,8 @@
 """
 ייצוא שיחות צ'אט ללוח שנה (iCal).
 """
+
 import logging
-from datetime import datetime
 from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,7 +20,7 @@ async def get_conversation_for_calendar_export(
     """
     אוסף נתוני שיחה לייצוא ללוח שנה.
     מחזיר None אם המשתמש לא participant או השיחה לא קיימת.
-    
+
     Returns:
         dict עם:
         - conversation_id
@@ -31,7 +31,7 @@ async def get_conversation_for_calendar_export(
     conv = await chat_crud.get_conversation_by_id(db, conversation_id, current_user_id)
     if not conv:
         return None
-    
+
     # איסוף הודעות
     messages = await chat_crud.get_messages(
         db,
@@ -39,11 +39,13 @@ async def get_conversation_for_calendar_export(
         limit=100,  # יותר הודעות ללוח שנה
         before_message_id=None,
     )
-    
+
     # זיהוי הצד השני
-    partner_user_id = conv.user_id_2 if conv.user_id_1 == current_user_id else conv.user_id_1
+    partner_user_id = (
+        conv.user_id_2 if conv.user_id_1 == current_user_id else conv.user_id_1
+    )
     partner_user = conv.user_2 if conv.user_id_1 == current_user_id else conv.user_1
-    
+
     return {
         "conversation_id": conversation_id,
         "messages": messages,

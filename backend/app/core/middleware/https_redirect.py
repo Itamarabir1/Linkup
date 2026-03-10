@@ -2,6 +2,7 @@
 הפנת HTTP → HTTPS כשהאפליקציה רצה מאחורי Proxy (Nginx, Cloudflare) שעושה TLS.
 משתמש ב־X-Forwarded-Proto ו־X-Forwarded-Host שהפרוקסי מעביר.
 """
+
 import logging
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -22,7 +23,10 @@ class HTTPSRedirectMiddleware(BaseHTTPMiddleware):
         if not getattr(settings, "FORCE_HTTPS_REDIRECT", False):
             return await call_next(request)
 
-        proto = request.headers.get("x-forwarded-proto", "").strip().lower() or request.url.scheme
+        proto = (
+            request.headers.get("x-forwarded-proto", "").strip().lower()
+            or request.url.scheme
+        )
         if proto == "https":
             return await call_next(request)
 

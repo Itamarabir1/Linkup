@@ -43,7 +43,9 @@ class RideService:
 
     # --- Preview ---
 
-    async def get_ride_preview(self, preview_in: RidePreviewCreate) -> RidePreviewResponse:
+    async def get_ride_preview(
+        self, preview_in: RidePreviewCreate
+    ) -> RidePreviewResponse:
         """שלב 1: יצירת תצוגה מקדימה של מסלולים אפשריים ושמירתם ב-Cache."""
         self._validate_preview_input(preview_in)
         origin_address = await geo_proc.resolve_origin_address(
@@ -56,7 +58,9 @@ class RideService:
             preview_in.destination_name,
         )
         if not geo_data:
-            raise RouteNotFoundError(origin=origin_address, destination=preview_in.destination_name)
+            raise RouteNotFoundError(
+                origin=origin_address, destination=preview_in.destination_name
+            )
         preview_res = RidePreviewResponse.from_processor(
             geo_data=geo_data,
             preview_in=preview_in,
@@ -67,7 +71,10 @@ class RideService:
 
     @staticmethod
     def _validate_preview_input(preview_in: RidePreviewCreate) -> None:
-        if preview_in.origin_name and preview_in.origin_name == preview_in.destination_name:
+        if (
+            preview_in.origin_name
+            and preview_in.origin_name == preview_in.destination_name
+        ):
             raise SameOriginDestinationError(location_name=preview_in.origin_name)
 
     # --- Create ride ---
@@ -93,13 +100,17 @@ class RideService:
             logger.error("Failed to save ride to DB: %s", e)
             raise
 
-    async def _validate_and_get_cached_ride(self, ride_in: RideCreate) -> Dict[str, Any]:
+    async def _validate_and_get_cached_ride(
+        self, ride_in: RideCreate
+    ) -> Dict[str, Any]:
         if not (ride_in.session_id and str(ride_in.session_id).strip()):
             logger.warning("create_ride called with empty session_id")
             raise SessionExpiredError(session_id=ride_in.session_id or "")
         cached_data = await self.cache.get_preview(ride_in.session_id)
         if not cached_data:
-            logger.warning("create_ride: no preview in cache for session_id=%s", ride_in.session_id)
+            logger.warning(
+                "create_ride: no preview in cache for session_id=%s", ride_in.session_id
+            )
             raise SessionExpiredError(session_id=ride_in.session_id)
         return cached_data
 
@@ -170,9 +181,13 @@ class RideService:
         if payload.available_seats is not None:
             update_dict["available_seats"] = payload.available_seats
         if not update_dict:
-            raise ValueError("נדרש לפחות שדה אחד לעדכון (departure_time או available_seats)")
+            raise ValueError(
+                "נדרש לפחות שדה אחד לעדכון (departure_time או available_seats)"
+            )
         ride = await db.run_sync(
-            lambda sess: crud_ride.update_partial(sess, ride_id, driver_id, **update_dict)
+            lambda sess: crud_ride.update_partial(
+                sess, ride_id, driver_id, **update_dict
+            )
         )
         if not ride:
             raise RideNotFoundError()
@@ -197,7 +212,9 @@ class RideService:
     ) -> None:
         """ביטול נסיעה על ידי הנהג. לוגיקה + Outbox ב-BookingService."""
         ride = await db.run_sync(
-            lambda sess: crud_ride.get_for_update(sess, ride_id=ride_id, driver_id=driver_id)
+            lambda sess: crud_ride.get_for_update(
+                sess, ride_id=ride_id, driver_id=driver_id
+            )
         )
         if not ride:
             raise RideNotFoundError(ride_id)

@@ -15,10 +15,6 @@ from app.domain.events.routing import (
 )
 from app.infrastructure.events.publishers.rabbitmq import RabbitMQPublisher
 
-from app.db import models
-from app.domain.rides.model import Ride
-from app.domain.users.model import User
-from app.domain.bookings.model import Booking
 # Workers & Tasks
 from app.workers.outbox_worker import run_outbox_worker
 from app.workers.tasks.notification_tasks import handle_notification_event
@@ -33,9 +29,10 @@ from app.workers.tasks.chat_summary_task import run_chat_completion_redis_listen
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("WorkerMain")
 
+
 async def main():
     logger.info("🚀 Linkup Worker Engine is starting...")
-    
+
     # 1. ניהול Graceful Shutdown - הגדרה מוקדמת
     stop_event = asyncio.Event()
     tasks = []
@@ -61,7 +58,9 @@ async def main():
 
         # 3. הזרקת תלויות (Dependency Injection)
         rmq_publisher = RabbitMQPublisher(rabbit_client=rabbit_client)
-        dispatcher = DispatcherFactory.create_standard_dispatcher(publishers=[rmq_publisher])
+        dispatcher = DispatcherFactory.create_standard_dispatcher(
+            publishers=[rmq_publisher]
+        )
 
         notifications_consumer = RabbitMQConsumer(
             rabbit_client,
@@ -81,9 +80,15 @@ async def main():
 
         # 4. הגדרת המשימות כ-Tasks עצמאיים (כולל משימות מתוזמנות דרך התור)
         tasks = [
-            asyncio.create_task(notifications_consumer.consume(callback=handle_notification_event)),
-            asyncio.create_task(avatar_upload_consumer.consume(callback=handle_avatar_upload_event)),
-            asyncio.create_task(scheduled_tasks_consumer.consume(callback=handle_scheduled_task)),
+            asyncio.create_task(
+                notifications_consumer.consume(callback=handle_notification_event)
+            ),
+            asyncio.create_task(
+                avatar_upload_consumer.consume(callback=handle_avatar_upload_event)
+            ),
+            asyncio.create_task(
+                scheduled_tasks_consumer.consume(callback=handle_scheduled_task)
+            ),
             asyncio.create_task(run_scheduled_tasks_publisher()),
             asyncio.create_task(run_outbox_worker(dispatcher=dispatcher)),
             asyncio.create_task(run_chat_completion_redis_listener(stop_event)),
@@ -93,7 +98,7 @@ async def main():
 
         # 5. המתנה לסיום - או שמישהו סימן עצירה, או שאחת המשימות קרסה
         stop_task = asyncio.create_task(stop_event.wait())
-        
+
         # אנחנו מחכים ש-stop_event יופעל (ע"י ה-handler או ה-except)
         await stop_task
 
@@ -103,22 +108,23 @@ async def main():
         stop_handler()
     except Exception as e:
         logger.error(f"❌ Critical error during worker startup: {e}", exc_info=True)
-    
+
     finally:
         # 6. ניקוי (Graceful Cleanup)
         logger.info("👋 Shutting down: Cancelling all tasks...")
-        
+
         for t in tasks:
             if not t.done():
                 t.cancel()
-        
+
         if tasks:
             # המתנה של מקסימום 5 שניות לסגירת המשימות
             await asyncio.wait(tasks, timeout=5)
-        
+
         # סגירת החיבור הפיזי לרביט
         await rabbit_client.close()
         logger.info("🏁 Linkup Worker Engine shut down cleanly.")
+
 
 if __name__ == "__main__":
     # שימוש ב-run בצורה בטוחה

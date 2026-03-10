@@ -1,6 +1,7 @@
 """
 Builder ל-context של מייל סיכום שיחה.
 """
+
 from typing import Any, Dict
 from app.domain.notifications.core.builders.base import BaseContextBuilder
 
@@ -52,11 +53,11 @@ class ChatBuilder(BaseContextBuilder):
     def build(self, payload: Dict[str, Any], event_key: str) -> Dict[str, Any]:
         """
         בונה context למייל סיכום שיחה.
-        
+
         Args:
             payload: נתוני האירוע מ-RabbitMQ (מכיל conversation_id, user_id_1, user_id_2, driver_name, passenger_name, pickup_location, meeting_time, summary_hebrew)
             event_key: שם האירוע (chat.conversation.completed)
-            
+
         Returns:
             Dict עם כל הנתונים למייל
         """
@@ -72,5 +73,5 @@ class ChatBuilder(BaseContextBuilder):
             "subject": "סיכום שיחה - LinkUp",
             "color": self._determine_color(event_key),
         }
-        
+
         return context

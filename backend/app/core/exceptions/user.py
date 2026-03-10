@@ -18,6 +18,7 @@ class UserNotFoundError(LinkupError):
             payload["identifier"] = identifier
         super().__init__(message=msg, payload=payload or None)
 
+
 class PhoneAlreadyRegisteredError(LinkupError):
     status_code = 400
     error_code = "USER_PHONE_TAKEN"
@@ -25,6 +26,7 @@ class PhoneAlreadyRegisteredError(LinkupError):
 
     def __init__(self, phone: str):
         super().__init__(message=f"{self.message}: {phone}", payload={"phone": phone})
+
 
 class EmailAlreadyRegisteredError(LinkupError):
     status_code = 400
@@ -34,10 +36,12 @@ class EmailAlreadyRegisteredError(LinkupError):
     def __init__(self, email: str):
         super().__init__(message=f"{self.message}: {email}", payload={"email": email})
 
+
 class PasswordsDoNotMatchError(LinkupError):
     status_code = 400
     error_code = "USER_PASSWORDS_MISMATCH"
     message = "הסיסמה החדשה ואישור הסיסמה אינם זהים"
+
 
 class PasswordSameAsOldError(LinkupError):
     status_code = 400

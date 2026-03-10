@@ -5,6 +5,7 @@ from geoalchemy2.shape import to_shape
 
 logger = logging.getLogger(__name__)
 
+
 def convert_db_route_to_list(route_geom) -> List[List[float]]:
     """המרת אובייקט Geometry מה-DB לרשימת [lat, lon] ל-Frontend."""
     if not route_geom:
@@ -25,11 +26,15 @@ def convert_db_route_to_list(route_geom) -> List[List[float]]:
         logger.error(f"❌ Failed to convert DB route geometry: {e}")
         return []
 
-def calculate_eta(start_time: datetime, duration_seconds: float, buffer_percent: float = 0.15) -> str:
+
+def calculate_eta(
+    start_time: datetime, duration_seconds: float, buffer_percent: float = 0.15
+) -> str:
     """חישוב שעת הגעה משוערת עם בופר."""
     total_seconds = duration_seconds * (1 + buffer_percent)
     eta_datetime = start_time + timedelta(seconds=total_seconds)
     return eta_datetime.strftime("%H:%M")
+
 
 def format_duration(seconds: float) -> str:
     """הופך שניות לטקסט קריא בעברית."""

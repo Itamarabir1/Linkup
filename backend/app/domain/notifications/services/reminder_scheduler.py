@@ -26,10 +26,13 @@ class ReminderScheduler:
         await self._remind_passengers(db, start_w, end_w)
         await self._remind_drivers(db, start_w, end_w)
 
-    async def _remind_passengers(self, db: AsyncSession, start: datetime, end: datetime):
+    async def _remind_passengers(
+        self, db: AsyncSession, start: datetime, end: datetime
+    ):
         # השם שונה מ-handle ל-remind כדי להבהיר מה הפעולה העסקית
         bookings = await crud_booking.get_bookings_for_reminders(db, start, end)
-        if not bookings: return
+        if not bookings:
+            return
 
         for booking in bookings:
             try:
@@ -42,15 +45,14 @@ class ReminderScheduler:
                 await db.flush()
             except Exception as e:
                 logger.error(f"❌ Failed passenger reminder {booking.booking_id}: {e}")
-        
-        await self._safe_commit(db, "Passenger Reminders")
 
+        await self._safe_commit(db, "Passenger Reminders")
 
     async def _remind_drivers(self, db: AsyncSession, start: datetime, end: datetime):
         # 1. הוספת await - עכשיו rides תהיה רשימה אמיתית
         rides = await crud_ride.get_rides_needing_reminders(db, start, end)
-        
-        if not rides: 
+
+        if not rides:
             return
 
         for ride in rides:
@@ -60,16 +62,16 @@ class ReminderScheduler:
                     event_name="RIDE_START_DRIVER",
                     payload={"ride_id": ride.ride_id},
                 )
-                
+
                 # 3. עדכון הסטטוס
                 ride.reminder_sent = True
-                
+
                 # 4. ביצוע Flush אסינכרוני כדי "לדחוף" את השינוי ל-DB בתוך הטרנזקציה
                 await db.flush()
-                
+
             except Exception as e:
                 logger.error(f"❌ Failed driver reminder {ride.ride_id}: {e}")
-        
+
         # 5. ביצוע Commit סופי
         await self._safe_commit(db, "Driver Reminders")
 
@@ -80,6 +82,7 @@ class ReminderScheduler:
         except Exception as e:
             await db.rollback()
             logger.critical(f"🔥 Database Error in {context}: {e}")
+
 
 # המופע שייובא ב-Celery/Cron task
 reminder_scheduler = ReminderScheduler()

@@ -7,11 +7,12 @@ from .evaluator import DispatchEvaluator
 
 logger = logging.getLogger(__name__)
 
+
 class DispatcherFactory:
     @staticmethod
     def create_standard_dispatcher(
         publishers: List[EventPublisher],
-        critical_targets: Optional[Set[DispatchTarget]] = None
+        critical_targets: Optional[Set[DispatchTarget]] = None,
     ) -> EventDispatcher:
         """
         בונה Dispatcher עם הגדרות סטנדרטיות.

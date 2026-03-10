@@ -2,6 +2,7 @@
 לוגיקת סגירת נסיעות שזמנן עבר – לשימוש ב-Worker/תזמון.
 מפריד מ-RideService כדי שה-service יישאר ממוקד בפעולות מול המשתמש (preview, create, cancel).
 """
+
 import logging
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -29,10 +30,13 @@ async def cleanup_expired_rides(db: Session) -> int:
         crud_booking.complete_bookings_by_ride_ids(db, ride_ids)
 
         for ride_id in ride_ids:
-            await publish_ride_update(ride_id, {
-                "status": RideStatus.COMPLETED.value,
-                "event": "RIDE_FINISHED",
-            })
+            await publish_ride_update(
+                ride_id,
+                {
+                    "status": RideStatus.COMPLETED.value,
+                    "event": "RIDE_FINISHED",
+                },
+            )
 
         db.commit()
         return len(ride_ids)

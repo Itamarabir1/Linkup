@@ -20,8 +20,7 @@ class PushProvider(BaseNotificationProvider):
             title_tpl = context.get("push_title", "עדכון מ-LinkUp")
             body_tpl = context.get("push_body", "")
             title, body = render_push_content(
-                {"title": title_tpl, "body": body_tpl},
-                **context
+                {"title": title_tpl, "body": body_tpl}, **context
             )
             # נתונים נוספים לאפליקציה (FCM דורש מפתחות וערכים כ-string)
             data = {}
@@ -37,7 +36,11 @@ class PushProvider(BaseNotificationProvider):
     def _handle_push_error(self, e: Exception, user: User):
         err_str = str(e).lower()
         uid = getattr(user, "user_id", None) or getattr(user, "id", "N/A")
-        if "not-registered" in err_str or "invalid" in err_str or "unregistered" in err_str:
+        if (
+            "not-registered" in err_str
+            or "invalid" in err_str
+            or "unregistered" in err_str
+        ):
             logger.warning(f"🗑️ Invalid/expired FCM token for user_id={uid}")
             # כאן אפשר לקרוא ל-CRUD ולאפס user.fcm_token ל-None
         else:

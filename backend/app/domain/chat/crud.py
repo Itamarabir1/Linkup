@@ -2,7 +2,8 @@
 CRUD צ'אט 1:1 – שיחות והודעות.
 תמיד שומרים user_id_1 < user_id_2 ב־Conversation.
 """
-from sqlalchemy import select, desc, or_, and_, func
+
+from sqlalchemy import select, desc, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from datetime import datetime, timedelta
@@ -92,26 +93,29 @@ async def get_conversations_with_timeout(
 ) -> list[Conversation]:
     """
     מחזיר שיחות שלא נשלח להן סיכום ושההודעה האחרונה בהן היא לפני timeout_hours שעות.
-    
+
     Args:
         db: AsyncSession
         timeout_hours: מספר שעות ללא הודעות חדשות (ברירת מחדל: 24)
-        
+
     Returns:
         רשימת שיחות שצריכות ניתוח
     """
     # זמן גבול: עכשיו פחות timeout_hours
     timeout_threshold = datetime.utcnow() - timedelta(hours=timeout_hours)
-    
+
     # שאילתה: שיחות שיש להן הודעה אחרונה לפני timeout_threshold
     # ואין להן ניתוח AI (chat_analysis)
     subquery = (
-        select(Message.conversation_id, func.max(Message.created_at).label("last_message_at"))
+        select(
+            Message.conversation_id,
+            func.max(Message.created_at).label("last_message_at"),
+        )
         .group_by(Message.conversation_id)
         .having(func.max(Message.created_at) < timeout_threshold)
         .subquery()
     )
-    
+
     # שיחות שיש להן הודעה אחרונה לפני timeout, ואין להן ניתוח
     result = await db.execute(
         select(Conversation)
@@ -120,7 +124,9 @@ async def get_conversations_with_timeout(
             selectinload(Conversation.user_2),
         )
         .join(subquery, Conversation.conversation_id == subquery.c.conversation_id)
-        .outerjoin(ChatAnalysis, Conversation.conversation_id == ChatAnalysis.conversation_id)
+        .outerjoin(
+            ChatAnalysis, Conversation.conversation_id == ChatAnalysis.conversation_id
+        )
         .where(ChatAnalysis.conversation_id.is_(None))  # אין ניתוח קיים
     )
     return list(result.scalars().unique().all())

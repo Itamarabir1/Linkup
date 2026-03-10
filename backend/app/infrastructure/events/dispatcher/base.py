@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, List
+from typing import Dict
 from app.domain.events.schema import Event
 from app.domain.events.enum import DispatchTarget
 from app.infrastructure.events.publishers.base import EventPublisher
@@ -7,11 +7,12 @@ from .evaluator import DispatchEvaluator
 
 logger = logging.getLogger(__name__)
 
+
 class EventDispatcher:
     def __init__(
-        self, 
+        self,
         publishers_map: Dict[DispatchTarget, EventPublisher],
-        evaluator: DispatchEvaluator
+        evaluator: DispatchEvaluator,
     ):
         self._publishers = publishers_map
         self._evaluator = evaluator
@@ -22,7 +23,7 @@ class EventDispatcher:
 
         for target in event.targets:
             publisher = self._publishers.get(target)
-            
+
             if not publisher:
                 logger.warning(f"⚠️ No publisher registered for target: {target}")
                 results[target] = False
@@ -40,5 +41,5 @@ class EventDispatcher:
 
         # העברת האחריות לבדיקת התוצאות ל-Evaluator
         self._evaluator.evaluate(event, results, errors)
-        
+
         return results

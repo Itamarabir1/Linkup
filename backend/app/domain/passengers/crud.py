@@ -1,6 +1,7 @@
 """
 CRUD לבקשות נוסעים – מקור אמת יחיד, API עקבי.
 """
+
 import logging
 from datetime import datetime, timedelta
 from typing import List, Optional
@@ -43,7 +44,9 @@ class CRUDPassenger:
         status: Optional[PassengerStatus] = None,
     ) -> List[PassengerRequest]:
         """שליפת בקשות לפי נוסע (למסך 'הבקשות שלי')."""
-        stmt = select(PassengerRequest).where(PassengerRequest.passenger_id == passenger_id)
+        stmt = select(PassengerRequest).where(
+            PassengerRequest.passenger_id == passenger_id
+        )
         if status is not None:
             stmt = stmt.where(PassengerRequest.status == status)
         stmt = stmt.order_by(PassengerRequest.requested_departure_time.desc())
@@ -64,6 +67,7 @@ class CRUDPassenger:
     ) -> PassengerRequest:
         """יצירת בקשה חדשה. passenger_id מהשרת (טוקן), לא מהגוף."""
         from datetime import timezone
+
         req_time = request.requested_departure_time
         if req_time is None:
             req_time = datetime.now(timezone.utc)
@@ -210,39 +214,62 @@ class CRUDPassenger:
         סדר פילטרים: סטטוס+זמן (אינדקס) → לא הנהג → אופט-אין → יעד 5km → מוצא על המסלול.
         """
         now = datetime.now()
-        ride_date = ride.departure_time.date() if getattr(ride, "departure_time", None) else None
+        ride_date = (
+            ride.departure_time.date()
+            if getattr(ride, "departure_time", None)
+            else None
+        )
         if not ride_date:
-            logger.warning("find_passengers_for_ride_notification: no ride_date for ride_id=%s", getattr(ride, "ride_id", None))
+            logger.warning(
+                "find_passengers_for_ride_notification: no ride_date for ride_id=%s",
+                getattr(ride, "ride_id", None),
+            )
             return []
-        
+
         # שימוש ב-route_coords ישירות מהמסד (לא המרה לרשימה וחזרה) – כמו ב-find_rides_by_coordinates
         route_geom = getattr(ride, "route_coords", None)
         if not route_geom:
-            logger.warning("find_passengers_for_ride_notification: no route_coords for ride_id=%s", getattr(ride, "ride_id", None))
+            logger.warning(
+                "find_passengers_for_ride_notification: no route_coords for ride_id=%s",
+                getattr(ride, "ride_id", None),
+            )
             return []
-        
+
         driver_id = getattr(ride, "driver_id", None)
         dest_geom = getattr(ride, "destination_geom", None)
         if not dest_geom:
-            logger.warning("find_passengers_for_ride_notification: no destination_geom for ride_id=%s", getattr(ride, "ride_id", None))
+            logger.warning(
+                "find_passengers_for_ride_notification: no destination_geom for ride_id=%s",
+                getattr(ride, "ride_id", None),
+            )
             return []
-        
+
         # חישוב טווח תאריכים גמיש (עד 7 ימים קדימה, עד יום אחד אחורה)
         min_date = ride_date - timedelta(days=1)
         max_date = ride_date + timedelta(days=7)
-        
+
         # ספירת נוסעים לפני סינון גיאוגרפי (לדיבוג)
-        total_active = db.query(PassengerRequest).filter(
-            PassengerRequest.status == PassengerStatus.ACTIVE,
-            PassengerRequest.requested_departure_time > now,
-            func.date(PassengerRequest.requested_departure_time) <= max_date,
-            func.date(PassengerRequest.requested_departure_time) >= min_date,
-            PassengerRequest.passenger_id != driver_id,
-            PassengerRequest.is_notification_active == True,
-        ).count()
-        logger.info("find_passengers_for_ride_notification: ride_id=%s, ride_date=%s, date_range=[%s, %s], total_active_passengers=%d (before geo filter)", 
-                   getattr(ride, "ride_id", None), ride_date, min_date, max_date, total_active)
-        
+        total_active = (
+            db.query(PassengerRequest)
+            .filter(
+                PassengerRequest.status == PassengerStatus.ACTIVE,
+                PassengerRequest.requested_departure_time > now,
+                func.date(PassengerRequest.requested_departure_time) <= max_date,
+                func.date(PassengerRequest.requested_departure_time) >= min_date,
+                PassengerRequest.passenger_id != driver_id,
+                PassengerRequest.is_notification_active == True,
+            )
+            .count()
+        )
+        logger.info(
+            "find_passengers_for_ride_notification: ride_id=%s, ride_date=%s, date_range=[%s, %s], total_active_passengers=%d (before geo filter)",
+            getattr(ride, "ride_id", None),
+            ride_date,
+            min_date,
+            max_date,
+            total_active,
+        )
+
         # מוצא הנוסע חייב להיות במרחק עד 2 ק"מ מהמסלול של הנסיעה (route)
         q = (
             db.query(PassengerRequest)
@@ -269,11 +296,16 @@ class CRUDPassenger:
             .limit(limit)
         )
         results = q.all()
-        logger.info("find_passengers_for_ride_notification: ride_id=%s, found %d matching passengers after all filters", 
-                   getattr(ride, "ride_id", None), len(results))
+        logger.info(
+            "find_passengers_for_ride_notification: ride_id=%s, found %d matching passengers after all filters",
+            getattr(ride, "ride_id", None),
+            len(results),
+        )
         if results:
-            logger.info("find_passengers_for_ride_notification: matching passenger_ids=%s", 
-                       [r.passenger_id for r in results])
+            logger.info(
+                "find_passengers_for_ride_notification: matching passenger_ids=%s",
+                [r.passenger_id for r in results],
+            )
         return results
 
     # --- נסיעות (שליפה לצורך UI/רשימות) ---

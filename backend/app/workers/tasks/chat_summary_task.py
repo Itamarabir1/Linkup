@@ -2,6 +2,7 @@
 טיפול באירועי סיום שיחה מ-Redis DB=1: ניתוח AI ושמירה.
 מאזין לערוץ chat:completion:* ומפעיל את handle_conversation_completion (domain/chat/ai).
 """
+
 import asyncio
 import json
 import logging
@@ -23,11 +24,16 @@ async def _process_completion_message(payload_str: str) -> None:
         conversation_id = data.get("conversation_id")
         trigger_user_id = data.get("trigger_user_id")
         if conversation_id is None or trigger_user_id is None:
-            logger.warning("chat completion event missing conversation_id or trigger_user_id: %s", data)
+            logger.warning(
+                "chat completion event missing conversation_id or trigger_user_id: %s",
+                data,
+            )
             return
         async with SessionLocal() as db:
             try:
-                await handle_conversation_completion(db, int(conversation_id), int(trigger_user_id))
+                await handle_conversation_completion(
+                    db, int(conversation_id), int(trigger_user_id)
+                )
                 await db.commit()
             except Exception:
                 await db.rollback()
@@ -46,11 +52,16 @@ async def run_chat_completion_redis_listener(stop_event: asyncio.Event) -> None:
         client = redis.from_url(settings.REDIS_CHAT_URL, decode_responses=True)
         pubsub = client.pubsub()
         await pubsub.psubscribe(CHAT_COMPLETION_PATTERN)
-        logger.info("Chat completion listener subscribed to %s (Redis DB=1)", CHAT_COMPLETION_PATTERN)
+        logger.info(
+            "Chat completion listener subscribed to %s (Redis DB=1)",
+            CHAT_COMPLETION_PATTERN,
+        )
 
         while not stop_event.is_set():
             try:
-                message = await asyncio.wait_for(pubsub.get_message(timeout=1.0), timeout=2.0)
+                message = await asyncio.wait_for(
+                    pubsub.get_message(timeout=1.0), timeout=2.0
+                )
             except asyncio.TimeoutError:
                 continue
             if message is None:
@@ -62,7 +73,9 @@ async def run_chat_completion_redis_listener(stop_event: asyncio.Event) -> None:
                 if isinstance(payload, str):
                     await _process_completion_message(payload)
             except Exception as e:
-                logger.error("Chat completion listener message error: %s", e, exc_info=True)
+                logger.error(
+                    "Chat completion listener message error: %s", e, exc_info=True
+                )
     except asyncio.CancelledError:
         logger.info("Chat completion listener cancelled.")
     except Exception as e:

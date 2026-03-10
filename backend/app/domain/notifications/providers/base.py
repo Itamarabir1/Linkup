@@ -1,14 +1,17 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict
 
+
 class BaseNotificationProvider(ABC):
     """
     ממשק שמגדיר איך 'ספק' נראה במערכת LinkUp.
     זה לא פלסטר, זה החוזה הארכיטקטוני.
     """
-    
+
     @abstractmethod
-    async def send(self, user: Any, channel_config: Dict[str, Any], context: Dict[str, Any]) -> None:
+    async def send(
+        self, user: Any, channel_config: Dict[str, Any], context: Dict[str, Any]
+    ) -> None:
         """חובה לממש לוגיקת שליחה אסינכרונית"""
         pass
 

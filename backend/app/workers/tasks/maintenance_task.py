@@ -4,6 +4,7 @@ from app.domain.system.maintenance_service import maintenance_service
 
 logger = logging.getLogger(__name__)
 
+
 async def execute_maintenance_job(service=maintenance_service):
     """
     ביצוע תחזוקה (נקרא מה-consumer של התור המתוזמן).

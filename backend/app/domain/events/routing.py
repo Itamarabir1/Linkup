@@ -23,6 +23,7 @@
   - תור אחד לכל "סוג צריכה": notifications_queue להתראות, avatar_upload_queue למשימות S3.
   - כל תור מקשיב ל-exchange(es) שמתאימים לו בלבד. לא מערבבים התראות ומשימות כבדות באותו תור.
 """
+
 from typing import Dict, Any, List
 
 # קידומת event_name → exchange

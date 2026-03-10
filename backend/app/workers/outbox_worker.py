@@ -7,6 +7,7 @@ from app.domain.system.outbox_service import OutboxService
 
 logger = logging.getLogger("OutboxWorker")
 
+
 async def run_outbox_worker(dispatcher: EventDispatcher, interval: float = 2.0):
     service = OutboxService(repo=OutboxRepository(), dispatcher=dispatcher)
 
@@ -19,11 +20,17 @@ async def run_outbox_worker(dispatcher: EventDispatcher, interval: float = 2.0):
             if _poll_count % 30 == 0:
                 n = len(events) if events else 0
                 print(f"[NOTIF] Worker: poll #{_poll_count} -> {n} pending", flush=True)
-                logger.info("[NOTIF] Outbox: poll #%s -> %s pending events", _poll_count, n)
+                logger.info(
+                    "[NOTIF] Outbox: poll #%s -> %s pending events", _poll_count, n
+                )
             if events:
                 logger.info("[NOTIF] Outbox: fetched %s pending event(s)", len(events))
                 for e in events:
-                    logger.info("[NOTIF] Outbox: processing event_id=%s event_name=%s", e.id, e.event_name)
+                    logger.info(
+                        "[NOTIF] Outbox: processing event_id=%s event_name=%s",
+                        e.id,
+                        e.event_name,
+                    )
                     try:
                         async with SessionLocal() as db:
                             await service.process_single_event(db, e)

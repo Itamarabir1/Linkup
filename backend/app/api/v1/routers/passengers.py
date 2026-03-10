@@ -23,13 +23,11 @@ from app.api.dependencies.auth import get_current_user, get_current_user_optiona
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(
-    prefix="/passengers",
-    tags=["Passengers"]
-)
+router = APIRouter(prefix="/passengers", tags=["Passengers"])
 
 # Sub-router for passenger-facing ride endpoints: /passenger/rides/...
 passenger_rides_router = APIRouter(prefix="/rides", tags=["Passenger"])
+
 
 # 0. הבקשות שלי (כנוסע)
 @router.get("/me", response_model=List[PassengerRequestResponse])
@@ -42,14 +40,18 @@ async def get_my_requests(
     ),
 ):
     """רשימת הבקשות שלי כנוסע."""
-    return await PassengerService.get_my_requests(db, current_user.user_id, status=status)
+    return await PassengerService.get_my_requests(
+        db, current_user.user_id, status=status
+    )
 
 
 # 1. רישום בקשה רשמית (הסוכן החכם)
-@router.post("/",
-             response_model=PassengerRequestWithMatches,
-             status_code=status.HTTP_201_CREATED,
-             summary="רישום נוסע לטרמפ (יצירת בקשה קבועה)")
+@router.post(
+    "/",
+    response_model=PassengerRequestWithMatches,
+    status_code=status.HTTP_201_CREATED,
+    summary="רישום נוסע לטרמפ (יצירת בקשה קבועה)",
+)
 def create_new_request(
     request: PassengerRequestCreate,
     db: Session = Depends(get_db),
@@ -65,19 +67,23 @@ def create_new_request(
         logger.error(f"Error in create_new_request: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="שגיאת שרת פנימית ביצירת הבקשה")
 
+
 # 2. עדכון הגדרות התראה
-@router.patch("/{request_id}/notifications", 
-              response_model=PassengerRequestResponse,
-              summary="עדכון סטטוס התראות לסוכן החכם")
+@router.patch(
+    "/{request_id}/notifications",
+    response_model=PassengerRequestResponse,
+    summary="עדכון סטטוס התראות לסוכן החכם",
+)
 def update_notification_status(
-    request_id: int, 
-    update_data: PassengerRequestUpdateNotifications, 
-    db: Session = Depends(get_db)
+    request_id: int,
+    update_data: PassengerRequestUpdateNotifications,
+    db: Session = Depends(get_db),
 ):
     """
     מעדכן האם הנוסע מעוניין לקבל התראות אקטיביות עבור בקשה זו.
     """
     return PassengerService.toggle_request_notifications(db, request_id, update_data)
+
 
 # --- Passenger rides sub-router: GET /passenger/rides/{ride_id}/driver-info ---
 @passenger_rides_router.get(
@@ -98,6 +104,7 @@ async def get_ride_driver_info(
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
+
 # --- בקשת הצטרפות מתוך חיפוש ---
 @router.post(
     "/request-ride-from-search",
@@ -112,9 +119,17 @@ async def request_ride_from_search(
 ):
     """משתמש ב-request_id מהחיפוש (אם קיים) או יוצר חדש. יוצר Booking, כותב אירוע ל-Outbox; ה-Worker שולח מייל לנהג."""
     import logging
+
     _log = logging.getLogger(__name__)
-    print(f"[NOTIF] API: request_ride_from_search START ride_id={body.ride_id}, request_id={body.request_id}", flush=True)
-    _log.info("[NOTIF] API: request_ride_from_search called ride_id=%s, request_id=%s", body.ride_id, body.request_id)
+    print(
+        f"[NOTIF] API: request_ride_from_search START ride_id={body.ride_id}, request_id={body.request_id}",
+        flush=True,
+    )
+    _log.info(
+        "[NOTIF] API: request_ride_from_search called ride_id=%s, request_id=%s",
+        body.ride_id,
+        body.request_id,
+    )
     from app.domain.bookings.service import BookingService
     from app.core.exceptions.booking import (
         RideNotAvailableError,
@@ -122,6 +137,7 @@ async def request_ride_from_search(
         PassengerRequestNotFoundError,
     )
     from app.core.exceptions.infrastructure import GeocodingError
+
     try:
         request_id = body.request_id
         # אם אין request_id, יצור אחד (edge case - לא אמור לקרות אם החיפוש עובד נכון)
@@ -136,7 +152,7 @@ async def request_ride_from_search(
                 )
             )
             request_id = new_request.request_id
-        
+
         return await BookingService.request_to_join(
             db,
             ride_id=body.ride_id,
@@ -153,15 +169,22 @@ async def request_ride_from_search(
     except PassengerRequestNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
+
 # 3. חיפוש חופשי (אם המשתמש מחובר, נשמרת בקשה ב-DB)
-@router.get("/search-rides",
-            response_model=RideSearchResponse,
-            summary="חיפוש טרמפים (אם מחובר, נשמרת בקשה ב-DB)")
+@router.get(
+    "/search-rides",
+    response_model=RideSearchResponse,
+    summary="חיפוש טרמפים (אם מחובר, נשמרת בקשה ב-DB)",
+)
 async def search_available_rides(
     pickup_name: str,
     destination_name: str,
-    search_radius: int = Query(1000, ge=100, description="רדיוס חיפוש במטרים (אחיד עם יצירת בקשה)"),
-    departure_time: Optional[datetime] = Query(None, description="אם ריק – יחפש מעכשיו"),
+    search_radius: int = Query(
+        1000, ge=100, description="רדיוס חיפוש במטרים (אחיד עם יצירת בקשה)"
+    ),
+    departure_time: Optional[datetime] = Query(
+        None, description="אם ריק – יחפש מעכשיו"
+    ),
     db: AsyncSession = Depends(get_db),
     current_user: Optional[User] = Depends(get_current_user_optional),
 ):
@@ -175,7 +198,9 @@ async def search_available_rides(
         )
         # המרת AsyncSession ל-Session sync באמצעות run_sync
         result = await db.run_sync(
-            lambda sync_db: PassengerService.search_rides_for_passenger(sync_db, search_data)
+            lambda sync_db: PassengerService.search_rides_for_passenger(
+                sync_db, search_data
+            )
         )
         return result
     except HTTPException:
@@ -184,42 +209,51 @@ async def search_available_rides(
         logger.error(f"Error in search_available_rides: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"שגיאה בחיפוש נסיעות: {str(e)}")
 
+
 # 4. ביטול בקשה
-@router.delete("/{request_id}/cancel", 
-               summary="ביטול בקשת נסיעה ושחרור שריונים")
+@router.delete("/{request_id}/cancel", summary="ביטול בקשת נסיעה ושחרור שריונים")
 async def cancel_request(
     request_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """מבטל את הבקשה ומשחרר אוטומטית את כל המושבים שנתפסו מול נהגים (רק לבעל הבקשה)."""
-    from app.core.exceptions.booking import PassengerRequestNotFoundError, ForbiddenRideActionError
+    from app.core.exceptions.booking import (
+        PassengerRequestNotFoundError,
+        ForbiddenRideActionError,
+    )
+
     try:
         return await db.run_sync(
-            lambda sess: PassengerService.cancel_request(sess, request_id, current_user.user_id)
+            lambda sess: PassengerService.cancel_request(
+                sess, request_id, current_user.user_id
+            )
         )
     except PassengerRequestNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ForbiddenRideActionError as e:
         raise HTTPException(status_code=403, detail=str(e))
 
+
 # 5. מציאת התאמות לבקשה קיימת
-@router.get("/{request_id}/matches", 
-            response_model=List[RideResponse],
-            summary="שליפת התאמות עדכניות לבקשה קיימת")
+@router.get(
+    "/{request_id}/matches",
+    response_model=List[RideResponse],
+    summary="שליפת התאמות עדכניות לבקשה קיימת",
+)
 def get_latest_matches(request_id: int, db: Session = Depends(get_db)):
     return PassengerService.get_matches_by_request_id(db, request_id)
 
 
-@router.get("/all", 
-            response_model=List[RideResponse], 
-            summary="תצוגת כל הנסיעות (ניהול ובקרה)")
+@router.get(
+    "/all", response_model=List[RideResponse], summary="תצוגת כל הנסיעות (ניהול ובקרה)"
+)
 def get_all_rides_admin(
-    status: str = Query(None, description="סנן לפי סטטוס: open, cancelled, completed"), 
-    db: Session = Depends(get_db)
+    status: str = Query(None, description="סנן לפי סטטוס: open, cancelled, completed"),
+    db: Session = Depends(get_db),
 ):
     """
-    מחזיר את כל הנסיעות במערכת. 
+    מחזיר את כל הנסיעות במערכת.
     אם נשלח סטטוס, יחזיר רק נסיעות בסטטוס הזה.
     """
     return PassengerService.get_all_rides_for_admin(db, status=status)

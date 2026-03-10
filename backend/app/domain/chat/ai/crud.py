@@ -1,6 +1,7 @@
 """
 CRUD operations לניתוח AI של שיחות צ'אט.
 """
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

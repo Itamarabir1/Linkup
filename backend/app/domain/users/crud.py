@@ -5,8 +5,9 @@ from sqlalchemy import func
 from geoalchemy2.functions import ST_GeomFromText
 
 # ייבוא המודל והסכימות
-from app.domain.users.model import User 
+from app.domain.users.model import User
 from app.domain.users.schema import UserCreate, UserUpdate
+
 
 class CRUDUser:
     """
@@ -35,7 +36,9 @@ class CRUDUser:
         result = await db.execute(select(User).filter(User.phone_number == phone))
         return result.scalars().first()
 
-    async def create(self, db: AsyncSession, *, obj_in: UserCreate, hashed_password: str) -> User:
+    async def create(
+        self, db: AsyncSession, *, obj_in: UserCreate, hashed_password: str
+    ) -> User:
         db_obj = User(
             full_name=obj_in.full_name,
             phone_number=obj_in.phone_number,
@@ -43,16 +46,23 @@ class CRUDUser:
             fcm_token=obj_in.fcm_token,
             hashed_password=hashed_password,
             is_active=True,
-            is_verified=False
+            is_verified=False,
         )
         db.add(db_obj)
-        # שים לב: הורדנו את ה-commit! 
-        # אנחנו עושים flush כדי לקבל את ה-ID (user_id) שנוצר מה-DB 
+        # שים לב: הורדנו את ה-commit!
+        # אנחנו עושים flush כדי לקבל את ה-ID (user_id) שנוצר מה-DB
         # מבלי לסיים את הטרנזקציה.
-        await db.flush() 
+        await db.flush()
         await db.refresh(db_obj)
         return db_obj
-    async def update(self, db: AsyncSession, *, db_obj: User, obj_in: Union[UserUpdate, Dict[str, Any]]) -> User:
+
+    async def update(
+        self,
+        db: AsyncSession,
+        *,
+        db_obj: User,
+        obj_in: Union[UserUpdate, Dict[str, Any]],
+    ) -> User:
         """
         עדכון דינמי וחסין.
         משתמש ב-model_dump כדי לעדכן רק שדות שנשלחו בבקשה.
@@ -64,20 +74,22 @@ class CRUDUser:
             update_data = obj_in.model_dump(exclude_unset=True)
 
         # שדות שאסור לעדכן דרך פונקציה כללית
-        protected_fields = ["user_id", "created_at", "hashed_password"] 
-        
+        protected_fields = ["user_id", "created_at", "hashed_password"]
+
         for field, value in update_data.items():
             if hasattr(db_obj, field) and field not in protected_fields:
                 setattr(db_obj, field, value)
-        
+
         db.add(db_obj)
         await db.commit()
         await db.refresh(db_obj)
         return db_obj
 
-    async def update_location(self, db: AsyncSession, *, user_id: int, lat: float, lon: float) -> bool:
+    async def update_location(
+        self, db: AsyncSession, *, user_id: int, lat: float, lon: float
+    ) -> bool:
         """עדכון מיקום גיאוגרפי (GIS)"""
-        point_wkt = f'POINT({lon} {lat})' # סטנדרט PostGIS: Longitude קודם
+        point_wkt = f"POINT({lon} {lat})"  # סטנדרט PostGIS: Longitude קודם
         user = await self.get_by_id(db, user_id)
         if user:
             user.last_location = ST_GeomFromText(point_wkt, srid=4326)
@@ -85,7 +97,9 @@ class CRUDUser:
             return True
         return False
 
-    async def update_fcm_token(self, db: AsyncSession, *, user: User, token: str) -> User:
+    async def update_fcm_token(
+        self, db: AsyncSession, *, user: User, token: str
+    ) -> User:
         """עדכון ה-FCM Token של המשתמש"""
         user.fcm_token = token
         db.add(user)
@@ -103,7 +117,9 @@ class CRUDUser:
         await db.refresh(user)
         return user
 
-    async def update_password(self, db: AsyncSession, *, user: User, hashed_password: str) -> User:
+    async def update_password(
+        self, db: AsyncSession, *, user: User, hashed_password: str
+    ) -> User:
         """עדכון סיסמה (מוצפנת בלבד)"""
         user.hashed_password = hashed_password
         db.add(user)
@@ -118,6 +134,7 @@ class CRUDUser:
         await db.commit()
         await db.refresh(user)
         return user
+
 
 # יצירת מופע יחיד (Singleton) שישמש את ה-Services
 crud_user = CRUDUser()

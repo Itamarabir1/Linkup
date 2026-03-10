@@ -5,6 +5,7 @@ from app.core.exceptions.base import LinkupError
 
 logger = logging.getLogger("linkup")
 
+
 # שים לב: הורדתי את הגרשיים מה-LinkupError בפרמטר exc
 async def linkup_exception_handler(request: Request, exc: LinkupError):
     """
@@ -23,6 +24,6 @@ async def linkup_exception_handler(request: Request, exc: LinkupError):
             "message": exc.message,
             "error_code": exc.error_code,
             "trace_id": exc.trace_id,
-            "details": exc.payload
-        }
+            "details": exc.payload,
+        },
     )

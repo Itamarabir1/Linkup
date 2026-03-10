@@ -3,11 +3,17 @@ from app.domain.events.enum import DispatchTarget
 from app.domain.events.schema import Event
 from app.core.exceptions.infrastructure import InfrastructureError
 
+
 class DispatchEvaluator:
     def __init__(self, critical_targets: Set[DispatchTarget]):
         self.critical_targets = critical_targets
 
-    def evaluate(self, event: Event, results: Dict[DispatchTarget, bool], errors: List[Tuple[DispatchTarget, str]]):
+    def evaluate(
+        self,
+        event: Event,
+        results: Dict[DispatchTarget, bool],
+        errors: List[Tuple[DispatchTarget, str]],
+    ):
         """
         בודק האם התוצאות עומדות במדיניות הקריטיות של המערכת.
         """
@@ -17,7 +23,7 @@ class DispatchEvaluator:
         if critical_failures:
             raise InfrastructureError(
                 message=f"Critical dispatch failure for {event.name}",
-                detail=f"Failed critical targets: {critical_failures}. Full errors: {errors}"
+                detail=f"Failed critical targets: {critical_failures}. Full errors: {errors}",
             )
-        
-        return failures # מחזיר רשימת כשלים לא קריטיים למעקב
+
+        return failures  # מחזיר רשימת כשלים לא קריטיים למעקב

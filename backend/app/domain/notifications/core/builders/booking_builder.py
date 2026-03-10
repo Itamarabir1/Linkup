@@ -69,23 +69,33 @@ class BookingBuilder(BaseContextBuilder):
             or _get_attr_path(booking, "passenger.full_name", None)
             or _get_attr_path(booking, "passenger.first_name", None)
         )
-        if not passenger_name or (isinstance(passenger_name, str) and not passenger_name.strip()):
+        if not passenger_name or (
+            isinstance(passenger_name, str) and not passenger_name.strip()
+        ):
             passenger_name = "נוסע"
-        context.update({
-            "booking_id": booking_id,
-            "ride_id": ride_id,
-            "num_seats": getattr(booking, "num_seats", 1),
-            "passenger_name": passenger_name.strip() if isinstance(passenger_name, str) else str(passenger_name),
-            "pickup_name": getattr(booking, "pickup_name", None) or _get_attr_path(
-                booking, "passenger_request.pickup_name", "—"
-            ),
-            "pickup_time": _format_datetime(pickup_time),
-            "ride_date": context.get("ride_date") or _format_datetime(getattr(ride, "departure_time", None)),
-            "passenger_destination": _get_attr_path(
-                booking, "passenger_request.destination_name", context.get("destination", "—")
-            ),
-            "action_url": inst._get_cta_url(f"rides/{ride_id}") if ride_id else f"{inst.BASE_URL}/bookings/{booking_id}",
-            "is_urgent": "urgent" in (event_key or "").lower(),
-        })
+        context.update(
+            {
+                "booking_id": booking_id,
+                "ride_id": ride_id,
+                "num_seats": getattr(booking, "num_seats", 1),
+                "passenger_name": passenger_name.strip()
+                if isinstance(passenger_name, str)
+                else str(passenger_name),
+                "pickup_name": getattr(booking, "pickup_name", None)
+                or _get_attr_path(booking, "passenger_request.pickup_name", "—"),
+                "pickup_time": _format_datetime(pickup_time),
+                "ride_date": context.get("ride_date")
+                or _format_datetime(getattr(ride, "departure_time", None)),
+                "passenger_destination": _get_attr_path(
+                    booking,
+                    "passenger_request.destination_name",
+                    context.get("destination", "—"),
+                ),
+                "action_url": inst._get_cta_url(f"rides/{ride_id}")
+                if ride_id
+                else f"{inst.BASE_URL}/bookings/{booking_id}",
+                "is_urgent": "urgent" in (event_key or "").lower(),
+            }
+        )
 
         return context

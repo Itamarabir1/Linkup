@@ -1,6 +1,7 @@
 # app/infrastructure/events/publishers/base.py
 from abc import ABC, abstractmethod
-from app.domain.events.model import Event, DispatchTarget # תיקון הנתיב ל-Domain
+from app.domain.events.model import Event, DispatchTarget  # תיקון הנתיב ל-Domain
+
 
 class EventPublisher(ABC):
     """
@@ -15,7 +16,7 @@ class EventPublisher(ABC):
         מחזיר True אם השליחה הצליחה, אחרת זורק שגיאה או מחזיר False.
         """
         pass
-    
+
     @abstractmethod
     def supports_target(self, target: DispatchTarget) -> bool:
         """

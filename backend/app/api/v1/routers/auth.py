@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, status, Query, Request, HTTPException
 from fastapi.responses import RedirectResponse, Response
-from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
@@ -13,7 +12,6 @@ logger = logging.getLogger(__name__)
 from app.domain.auth.schema import (
     UserRegister,
     UserOut,
-    Token,
     LoginRequest,
     LoginResponse,
     RefreshRequest,
@@ -30,17 +28,18 @@ from app.domain.auth.service import auth_service
 
 router = APIRouter()
 
+
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 async def register(
-    user_in: UserRegister, 
+    user_in: UserRegister,
     db: AsyncSession = Depends(get_db),
-    response: Response = Response()
+    response: Response = Response(),
 ):
     """רישום משתמש חדש - השלב הראשון"""
     logger.info("[Linkup] register נקרא: email=%s", getattr(user_in, "email", ""))
     print("[Linkup] register endpoint – מתחיל register_new_user")
     new_user = await auth_service.register_new_user(db=db, user_in=user_in)
-    
+
     # שמירת האימייל ב-cookie לאימות (תוקף 10 דקות)
     response.set_cookie(
         key="pending_verification_email",
@@ -48,10 +47,11 @@ async def register(
         max_age=600,  # 10 דקות
         httponly=True,
         secure=getattr(settings, "FORCE_HTTPS_REDIRECT", False),  # Secure רק ב-HTTPS
-        samesite="lax"
+        samesite="lax",
     )
-    
+
     return new_user
+
 
 @router.post("/forgot-password")
 async def forgot_password(
@@ -87,7 +87,7 @@ async def login(
     3. הדבק את ה-`access_token` בשדה.
     4. מהיום הזה, כל הבקשות המוגנות ב-Swagger יעבדו אוטומטית.
 
-    הלקוח ישלח את **access_token** בכל בקשה מוגנת: `Authorization: Bearer <access_token>`.  
+    הלקוח ישלח את **access_token** בכל בקשה מוגנת: `Authorization: Bearer <access_token>`.
     את **refresh_token** שומרים (למשל ב־storage) ומשתמשים ב־POST /auth/refresh לקבלת access_token חדש.
     """
     return await auth_service.authenticate_and_create_token(
@@ -145,7 +145,9 @@ async def verify_email_by_link(
         await auth_service.verify_user_email(db, email, code)
         return RedirectResponse(url=f"{base}/verified", status_code=302)
     except Exception:
-        return RedirectResponse(url=f"{base}/verify-email?error=invalid", status_code=302)
+        return RedirectResponse(
+            url=f"{base}/verify-email?error=invalid", status_code=302
+        )
 
 
 @router.post("/verify-email", response_model=AuthMessageResponse)
@@ -153,7 +155,7 @@ async def verify_email(
     data: VerifyEmailRequest,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    response: Response = Response()
+    response: Response = Response(),
 ):
     """
     אימות המייל מהפרונט (המשתמש מזין קוד בדף).
@@ -165,27 +167,29 @@ async def verify_email(
         email = request.cookies.get("pending_verification_email")
         if not email:
             from app.core.exceptions.user import UserNotFoundError
+
             raise UserNotFoundError()
-    
+
     result = await auth_service.verify_user_email(db, email, data.code)
-    
+
     # מחיקת ה-cookie אחרי אימות מוצלח
     response.delete_cookie(
         key="pending_verification_email",
         httponly=True,
         secure=getattr(settings, "FORCE_HTTPS_REDIRECT", False),
-        samesite="lax"
+        samesite="lax",
     )
-    
+
     return result
+
 
 @router.post("/resend-verification", response_model=AuthMessageResponse)
 async def resend_verification_code(
-    data: EmailOnlyRequest, 
-    db: AsyncSession = Depends(get_db)
+    data: EmailOnlyRequest, db: AsyncSession = Depends(get_db)
 ):
     """שליחה חוזרת של קוד האימות"""
     return await auth_service.initiate_email_verification(db, data.email)
+
 
 @router.post("/password-reset/request", response_model=AuthMessageResponse)
 async def request_password_reset(
@@ -195,6 +199,7 @@ async def request_password_reset(
 ):
     """שחזור סיסמה – שלב 1: המשתמש מזין מייל, נשלח אליו קוד במייל."""
     return await auth_service.request_password_reset(db, data.email)
+
 
 @router.post("/password-reset/confirm", response_model=PasswordResetConfirmResponse)
 async def confirm_password_reset(
@@ -220,7 +225,9 @@ async def change_password(
     שינוי סיסמה למשתמש מחובר: סיסמה ישנה + סיסמה חדשה פעמיים (אישור).
     ולידציה כמו ברישום: חוזק סיסמה + התאמה בין שני שדות הסיסמה החדשה.
     """
-    return await auth_service.change_password(db, user_id=current_user.user_id, data=data)
+    return await auth_service.change_password(
+        db, user_id=current_user.user_id, data=data
+    )
 
 
 @router.post(
@@ -236,10 +243,10 @@ async def google_signin(
 ):
     """
     התחברות/רישום דרך Google OAuth.
-    
+
     מקבל ID token מ-Google Sign-In (הפרונט שולח את ה-token שהתקבל מ-Google).
     השרת מאמת את ה-token עם Google, ואם המשתמש לא קיים - יוצר משתמש חדש אוטומטית (auto-signup).
-    
+
     מחזיר access_token + refresh_token + user (כמו /login רגיל).
     """
     try:
@@ -248,15 +255,17 @@ async def google_signin(
             logger.error("GOOGLE_CLIENT_ID not configured in settings")
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Google OAuth not configured. Please set GOOGLE_CLIENT_ID in backend/.env"
+                detail="Google OAuth not configured. Please set GOOGLE_CLIENT_ID in backend/.env",
             )
-        
-        return await auth_service.authenticate_with_google(db=db, id_token=data.id_token)
+
+        return await auth_service.authenticate_with_google(
+            db=db, id_token=data.id_token
+        )
     except HTTPException:
         raise
     except Exception as e:
         logger.exception(f"Error in google_signin endpoint: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Google sign-in failed: {str(e)}"
+            detail=f"Google sign-in failed: {str(e)}",
         )

@@ -1,6 +1,6 @@
 import logging
-from typing import Any, Optional, Dict
-from datetime import datetime
+from typing import Any, Dict
+
 # ייבוא השגיאה המותאמת שלך
 from app.core.exceptions.handlers import LinkupError
 
@@ -11,7 +11,7 @@ from app.core.exceptions.handlers import LinkupError
 #     Infrastructure Layer for Context Builders.
 #     מכיל כלי עזר לחילוץ נתונים בטוח ולוגיקה ויזואלית משותפת.
 #     """
-    
+
 #     BASE_URL = "https://itamarabir.com"
 
 #     @classmethod
@@ -21,7 +21,7 @@ from app.core.exceptions.handlers import LinkupError
 #         """
 #         if obj is None:
 #             return default
-            
+
 #         current = obj
 #         for attr in path.split("."):
 #             current = getattr(current, attr, None)
@@ -36,12 +36,12 @@ from app.core.exceptions.handlers import LinkupError
 #         """
 #         if not event_key:
 #             return "green"
-            
+
 #         danger_keywords = {"cancel", "reject", "fail", "delete", "stop", "urgent"}
 #         event_lower = event_key.lower()
 #         if any(word in event_lower for word in danger_keywords):
 #             return "red"
-            
+
 #         return "green"
 
 #     @staticmethod
@@ -91,17 +91,13 @@ from app.core.exceptions.handlers import LinkupError
 #                 status_code=500
 #             )
 
-from typing import Any
 from .builders.registry import CONTEXT_MAP
-from app.core.exceptions.handlers import LinkupError
 
-import logging
-from typing import Any, Dict
-from .builders.registry import CONTEXT_MAP
 from app.domain.notifications.constants import NotificationEvent
 from app.core.exceptions.base import LinkupError
 
 logger = logging.getLogger(__name__)
+
 
 class NotificationContextFacade:
     @classmethod

@@ -1,5 +1,5 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
@@ -11,19 +11,16 @@ from app.domain.users.schema import (
     UserRead,
     UserUpdate,
     FCMTokenUpdate,
-    UserLocationUpdate,
     MessageResponse,
     AvatarUploadAcceptedResponse,
-    AvatarUploadUrlRequest,
     AvatarUploadUrlResponse,
     AvatarUploadConfirmRequest,
 )
-from app.domain.rides.schema import RideResponse
 from app.domain.bookings.service import BookingService
 from app.domain.bookings.schema import NotificationItemResponse
-from pydantic import BaseModel, HttpUrl
 
 router = APIRouter(tags=["Users"])  # prefix="/users" ניתן ב-api_router
+
 
 # --- 1. הפרופיל שלי ---
 @router.get("/me", response_model=UserRead)
@@ -41,6 +38,7 @@ async def get_my_notifications(
     """כל ההתראות של המשתמש: כנהג – בקשות להצטרפות; כנוסע – אישור/דחייה/ממתין."""
     return await BookingService.get_notifications_for_user(db, current_user.user_id)
 
+
 # --- 2. עדכון טוקן FCM (פוש נוטיפיקציות) ---
 @router.patch("/fcm-token", response_model=MessageResponse)
 async def update_fcm_token(
@@ -49,18 +47,15 @@ async def update_fcm_token(
     current_user: User = Depends(get_current_user),
 ):
     await user_service.update_fcm_token(
-        db, 
-        user_id=current_user.user_id, 
-        fcm_token=data.fcm_token
-    )
-    
-    # עדיף להחזיר מופע של הסכמה
-    return MessageResponse(
-        message="FCM Token updated successfully", 
-        status="success"
+        db, user_id=current_user.user_id, fcm_token=data.fcm_token
     )
 
+    # עדיף להחזיר מופע של הסכמה
+    return MessageResponse(message="FCM Token updated successfully", status="success")
+
+
 # --- 5. העלאת תמונת פרופיל (שתי דרכים) ---
+
 
 # דרך 1: Presigned URL (מומלץ - 202 מהיר יותר)
 @router.get(
@@ -125,7 +120,7 @@ async def upload_my_avatar(
     אם יש תמונה קיימת – מוחק מענן ומ-DB ואז מעלה את החדשה.
     מחזיר 202 (התמונה בהעלאה) – העיבוד (S3 + עדכון DB) מתבצע ברקע.
     בפרונט: להציג "התמונה בהעלאה" ולעדכן את avatar_url כשמוכן (polling GET /me או WebSocket).
-    
+
     הערה: מומלץ להשתמש ב-GET /me/avatar/upload-url + POST /me/avatar/confirm לקבלת 202 מהיר יותר.
     """
     await user_service.schedule_avatar_upload(db, current_user, file)
@@ -146,8 +141,9 @@ async def remove_my_avatar(
     העיבוד (מחיקה מ-S3) מתבצע ברקע על ידי ה-worker.
     """
     await user_service.remove_avatar(db, user_id=current_user.user_id)
-    return AvatarUploadAcceptedResponse(message="Avatar removal accepted", status="accepted")
-
+    return AvatarUploadAcceptedResponse(
+        message="Avatar removal accepted", status="accepted"
+    )
 
 
 # --- עדכון פרטי פרופיל (שם, אימייל וכו') ---
@@ -158,13 +154,13 @@ async def update_my_profile(
     current_user: User = Depends(get_current_user),
 ):
     """
-    עדכון פרטי המשתמש המחובר. 
+    עדכון פרטי המשתמש המחובר.
     מקבל אובייקט UserUpdate ומעביר אותו כפי שהוא לסרוויס.
     """
     return await user_service.update_user_info(
-        db, 
-        user_id=current_user.user_id, 
-        update_data=data # מעביר את כל הסכימה
+        db,
+        user_id=current_user.user_id,
+        update_data=data,  # מעביר את כל הסכימה
     )
 
 
@@ -177,20 +173,20 @@ async def update_my_profile(
 # ):
 #     # הלוגיקה וזריקת LinkupError יקרו בתוך הסרוויס
 #     await user_service.update_user_location(
-#         db, 
-#         user_id=current_user.user_id, 
-#         lat=data.latitude, 
+#         db,
+#         user_id=current_user.user_id,
+#         lat=data.latitude,
 #         lon=data.longitude
 #     )
-    
+
 #     return MessageResponse(
-#         message="Location updated successfully", 
+#         message="Location updated successfully",
 #         status="success"
 #     )
 # --- 4. צפייה בפרופיל ציבורי ---
 # @router.get("/{user_id}", response_model=UserPublicRead)
 # async def get_user_public_profile(
-#     user_id: int, 
+#     user_id: int,
 #     db: Session = Depends(get_db),
 #     current_user: User = Depends(get_current_user)
 # ):
@@ -199,4 +195,3 @@ async def update_my_profile(
 #     if not user:
 #         raise HTTPException(status_code=404, detail="User not found")
 #     return user
-

@@ -49,14 +49,16 @@ def _decode_polyline(encoded: str) -> List[List[float]]:
 
 class GeoClient:
     """אחריות: התממשקות טכנית (Infrastructure) מול API חיצוני ב-Async"""
-    
+
     OSRM_URL = "http://router.project-osrm.org/route/v1/driving"
 
     def __init__(self):
         # Nominatim דורש User Agent ייחודי
         self.geolocator = Nominatim(user_agent=settings.APP_NAME, timeout=10)
 
-    async def fetch_coordinates(self, address: str) -> Tuple[Optional[float], Optional[float]]:
+    async def fetch_coordinates(
+        self, address: str
+    ) -> Tuple[Optional[float], Optional[float]]:
         """הופך כתובת לקואורדינטות (Geocoding)"""
         try:
             # Nominatim עצמו הוא סינכרוני, אז אנחנו מריצים אותו בצורה שלא תחסום
@@ -113,7 +115,9 @@ class GeoClient:
                 logger.warning(f"Distance Matrix error: {e}")
                 return None
 
-    async def fetch_raw_routes(self, start: Tuple[float, float], end: Tuple[float, float]) -> List[Dict]:
+    async def fetch_raw_routes(
+        self, start: Tuple[float, float], end: Tuple[float, float]
+    ) -> List[Dict]:
         """
         שליפת 2-3 מסלולים מ-Google Directions API.
         זמן ומרחק לכל מסלול מגיעים מ-Distance Matrix API (fallback ל-Directions אם נכשל).
@@ -155,17 +159,23 @@ class GeoClient:
                 out: List[Dict] = []
                 for i, r in enumerate(routes_raw):
                     legs = r.get("legs", [])
-                    duration_sec = sum(leg.get("duration", {}).get("value", 0) for leg in legs)
-                    distance_m = sum(leg.get("distance", {}).get("value", 0) for leg in legs)
+                    duration_sec = sum(
+                        leg.get("duration", {}).get("value", 0) for leg in legs
+                    )
+                    distance_m = sum(
+                        leg.get("distance", {}).get("value", 0) for leg in legs
+                    )
                     poly = r.get("overview_polyline", {}).get("points", "")
                     coords = _decode_polyline(poly) if poly else []
                     summary = r.get("summary") or f"מסלול {i + 1}"
-                    out.append({
-                        "summary": summary,
-                        "duration": duration_sec,
-                        "distance": distance_m,
-                        "coords": coords,
-                    })
+                    out.append(
+                        {
+                            "summary": summary,
+                            "duration": duration_sec,
+                            "distance": distance_m,
+                            "coords": coords,
+                        }
+                    )
                 # זמן ומרחק Distance Matrix API (זמן נסיעה וק"מ לכל מסלול)
                 dm_result = await self.fetch_distance_matrix(start, end)
                 if dm_result:
@@ -173,11 +183,16 @@ class GeoClient:
                     for route in out:
                         route["duration"] = duration_dm
                         route["distance"] = distance_dm
-                    logger.info(f"Distance Matrix: duration={duration_dm}s, distance={distance_dm}m applied to {len(out)} routes")
-                logger.info(f"Google Directions: {len(out)} routes for {origin} -> {destination}")
+                    logger.info(
+                        f"Distance Matrix: duration={duration_dm}s, distance={distance_dm}m applied to {len(out)} routes"
+                    )
+                logger.info(
+                    f"Google Directions: {len(out)} routes for {origin} -> {destination}"
+                )
                 return out
             except Exception as e:
                 logger.error(f"Google Directions error: {e}", exc_info=True)
                 return []
+
 
 geo_client = GeoClient()

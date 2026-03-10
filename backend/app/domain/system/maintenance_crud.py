@@ -8,9 +8,6 @@ from sqlalchemy.exc import ProgrammingError
 from app.domain.rides.model import Ride
 from app.domain.passengers.model import PassengerRequest
 from app.domain.bookings.model import Booking
-from app.domain.rides.enum import RideStatus
-from app.domain.passengers.enum import PassengerStatus
-from app.domain.bookings.enum import BookingStatus
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +15,9 @@ logger = logging.getLogger(__name__)
 def _table_missing(exc: BaseException) -> bool:
     """בודק אם השגיאה היא טבלה/relation לא קיימת (schema לא הורץ)."""
     msg = str(exc).lower()
-    return "does not exist" in msg or "undefinedtable" in msg or "undefined_table" in msg
+    return (
+        "does not exist" in msg or "undefinedtable" in msg or "undefined_table" in msg
+    )
 
 
 class MaintenanceCRUD:
@@ -42,7 +41,10 @@ class MaintenanceCRUD:
         try:
             stmt = (
                 update(Ride)
-                .where(Ride.departure_time <= now, Ride.status == text("'open'::ride_status"))
+                .where(
+                    Ride.departure_time <= now,
+                    Ride.status == text("'open'::ride_status"),
+                )
                 .values(status=text("'completed'::ride_status"))
             )
             res = await db.execute(stmt)
@@ -50,17 +52,23 @@ class MaintenanceCRUD:
         except ProgrammingError as e:
             if _table_missing(e):
                 await db.rollback()
-                logger.warning("Maintenance: table rides missing or schema not applied – skipping. %s", e)
+                logger.warning(
+                    "Maintenance: table rides missing or schema not applied – skipping. %s",
+                    e,
+                )
                 return 0
             raise
 
-    async def _update_expired_passenger_requests(self, db: AsyncSession, now: datetime) -> int:
+    async def _update_expired_passenger_requests(
+        self, db: AsyncSession, now: datetime
+    ) -> int:
         try:
             stmt = (
                 update(PassengerRequest)
                 .where(
                     PassengerRequest.requested_departure_time <= now,
-                    PassengerRequest.status == text("'active'::passenger_request_status"),
+                    PassengerRequest.status
+                    == text("'active'::passenger_request_status"),
                 )
                 .values(status=text("'expired'::passenger_request_status"))
             )
@@ -70,18 +78,22 @@ class MaintenanceCRUD:
             if _table_missing(e):
                 await db.rollback()
                 logger.warning(
-                    "Maintenance: table passenger_requests missing – run db/schema.sql. %s", e
+                    "Maintenance: table passenger_requests missing – run db/schema.sql. %s",
+                    e,
                 )
                 return 0
             raise
 
-    async def _update_completed_passenger_requests(self, db: AsyncSession, now: datetime) -> int:
+    async def _update_completed_passenger_requests(
+        self, db: AsyncSession, now: datetime
+    ) -> int:
         try:
             stmt = (
                 update(PassengerRequest)
                 .where(
                     PassengerRequest.requested_departure_time <= now,
-                    PassengerRequest.status == text("'matched'::passenger_request_status"),
+                    PassengerRequest.status
+                    == text("'matched'::passenger_request_status"),
                 )
                 .values(status=text("'cancelled'::passenger_request_status"))
             )
@@ -109,8 +121,11 @@ class MaintenanceCRUD:
         except ProgrammingError as e:
             if _table_missing(e):
                 await db.rollback()
-                logger.warning("Maintenance: table bookings missing – run db/schema.sql. %s", e)
+                logger.warning(
+                    "Maintenance: table bookings missing – run db/schema.sql. %s", e
+                )
                 return 0
             raise
+
 
 crud_maintenance = MaintenanceCRUD()

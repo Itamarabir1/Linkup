@@ -5,7 +5,9 @@ from app.domain.notifications.providers.base import BaseNotificationProvider
 from app.domain.notifications.channels.email.client import email_client
 from app.domain.notifications.channels.email.renderer import render_email_template
 from app.domain.users.model import User
+
 logger = logging.getLogger(__name__)
+
 
 class EmailProvider(BaseNotificationProvider):
     def _render_subject(self, subject: str, context: Dict[str, Any]) -> str:
@@ -24,10 +26,10 @@ class EmailProvider(BaseNotificationProvider):
             # ה-Subject יכול להגיע מהקונטקסט (הבילדר הכין אותו) – מחליפים placeholders
             raw_subject = context.get("subject", "Update from Linkup")
             subject = self._render_subject(raw_subject, context)
-            
+
             # 1. רינדור ה-HTML
             html_content = render_email_template(template_name, **context)
-            
+
             # 2. שליחה דרך EmailClient (Brevo) – נמען = הנהג/משתמש; Brevo דורש name ב-to
             if html_content:
                 recipient_name = (
@@ -39,7 +41,12 @@ class EmailProvider(BaseNotificationProvider):
                 if recipient_name is not None:
                     recipient_name = str(recipient_name).strip()
                 recipient_name = recipient_name or "User"
-                logger.info("[NOTIF] Email: sending to=%s name=%s subject=%s", user.email, recipient_name, (subject or "")[:60])
+                logger.info(
+                    "[NOTIF] Email: sending to=%s name=%s subject=%s",
+                    user.email,
+                    recipient_name,
+                    (subject or "")[:60],
+                )
                 await email_client.send(
                     recipient=user.email,
                     subject=subject,
@@ -48,10 +55,18 @@ class EmailProvider(BaseNotificationProvider):
                 )
                 logger.info("[NOTIF] Email: sent to=%s", user.email)
             else:
-                logger.warning("[NOTIF] Email: no html_content, skip send to=%s", getattr(user, "email", "?"))
+                logger.warning(
+                    "[NOTIF] Email: no html_content, skip send to=%s",
+                    getattr(user, "email", "?"),
+                )
         except Exception as e:
-            logger.error("[NOTIF] Email: FAILED to=%s: %s", getattr(user, "email", "?"), e, exc_info=True)
+            logger.error(
+                "[NOTIF] Email: FAILED to=%s: %s",
+                getattr(user, "email", "?"),
+                e,
+                exc_info=True,
+            )
             raise
 
     def can_send(self, user) -> bool:
-        return bool(user and hasattr(user, 'email') and "@" in user.email)
+        return bool(user and hasattr(user, "email") and "@" in user.email)

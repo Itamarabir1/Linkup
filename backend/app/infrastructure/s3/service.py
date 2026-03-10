@@ -6,6 +6,7 @@
 1. דרך API: streaming ישירות מ-UploadFile ל-S3 (בלי tempfile).
 2. Presigned URL: הלקוח מעלה ישירות ל-S3, השרת רק מחזיר URL.
 """
+
 import uuid
 import logging
 from typing import Optional
@@ -42,7 +43,7 @@ class StorageService:
         """
         ext = _normalize_avatar_ext(file.filename)
         staging_key = f"{STAGING_PREFIX}{user_id}_{uuid.uuid4().hex}.{ext}"
-        
+
         # Streaming ישירות מ-UploadFile ל-S3 - בלי tempfile ובלי לקרוא הכל לזיכרון
         await self.client.upload_fileobj(
             file_data=file.file,
@@ -63,13 +64,13 @@ class StorageService:
         ext = _normalize_avatar_ext(filename)
         staging_key = f"{STAGING_PREFIX}{user_id}_{uuid.uuid4().hex}.{ext}"
         content_type = f"image/{ext}"
-        
+
         presigned_url = await self.client.generate_presigned_upload_url(
             key=staging_key,
             content_type=content_type,
             expiration=expiration,
         )
-        
+
         logger.info("Generated presigned URL for avatar upload: key=%s", staging_key)
         return presigned_url, staging_key
 
@@ -87,21 +88,27 @@ class StorageService:
             final_key = f"{FINAL_PREFIX}{base_name}-{user_id}.{ext}"
         else:
             final_key = f"{FINAL_PREFIX}{user_id}.{ext}"
-        
+
         # מחיקת קובץ קיים אם יש (למקרה של החלפה)
         try:
             await self.client.delete_object(final_key)
         except Exception:
             pass  # לא קיים או כבר נמחק - זה בסדר
-        
-        final_url = await self.client.copy_object(source_key=staging_key, dest_key=final_key)
+
+        final_url = await self.client.copy_object(
+            source_key=staging_key, dest_key=final_key
+        )
         await self.client.delete_object(staging_key)
         logger.info("Avatar finalized: %s -> %s", staging_key, final_key)
         return final_url
 
     async def upload_user_avatar(self, file: UploadFile, user_id: int) -> str:
         """העלאה סינכרונית ישירה (לשימוש לא-תור). מבנה: users/{user_id}/avatars/{uuid}.ext"""
-        ext = (file.filename or "").split(".")[-1] if "." in (file.filename or "") else "jpg"
+        ext = (
+            (file.filename or "").split(".")[-1]
+            if "." in (file.filename or "")
+            else "jpg"
+        )
         key = f"users/{user_id}/avatars/{uuid.uuid4()}.{ext}"
         return await self.client.upload_fileobj(
             file_data=file.file,
@@ -123,7 +130,7 @@ class StorageService:
         # Path-style: path = "bucket/key" – להסיר את שם ה-bucket
         bucket_prefix = self.client.bucket_name + "/"
         if path.startswith(bucket_prefix):
-            path = path[len(bucket_prefix):]
+            path = path[len(bucket_prefix) :]
         return path if path else None
 
     async def delete_old_avatar(self, avatar_url: str) -> None:
@@ -133,7 +140,9 @@ class StorageService:
         key = self._url_to_key(avatar_url)
         if not key:
             logger.error("Could not extract S3 key from avatar_url: %s", avatar_url)
-            raise ValueError(f"Cannot extract S3 key from avatar_url: {avatar_url[:80]!r}")
+            raise ValueError(
+                f"Cannot extract S3 key from avatar_url: {avatar_url[:80]!r}"
+            )
         logger.info("Deleting avatar from S3: key=%s (url=%s)", key, avatar_url[:80])
         await self.client.delete_object(key)
         logger.info("Avatar deleted from S3: key=%s", key)

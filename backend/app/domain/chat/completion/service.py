@@ -1,11 +1,11 @@
 """
 Service לזיהוי סיום שיחה, ניתוח AI, ושמירת תוצאות.
 """
+
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.chat import crud as chat_crud
-from app.domain.chat.completion.detector import is_conversation_completion_message
 from app.domain.chat.ai.analyzer import analyze_conversation
 from app.domain.chat.ai.crud import create_analysis, analysis_exists
 from app.domain.chat.ai.analysis import get_conversation_text_for_analysis
@@ -21,27 +21,31 @@ async def handle_conversation_completion(
 ) -> bool:
     """
     מטפל בסיום שיחה: בודק אם כבר נותח, מנתח, שומר, ושולח event.
-    
+
     Args:
         db: AsyncSession
         conversation_id: מזהה השיחה
         current_user_id: מזהה המשתמש הנוכחי (לבדיקת הרשאות)
-        
+
     Returns:
         True אם הצליח, False אחרת
     """
     try:
         # בדיקה שהשיחה קיימת והמשתמש participant
-        conv = await chat_crud.get_conversation_by_id(db, conversation_id, current_user_id)
+        conv = await chat_crud.get_conversation_by_id(
+            db, conversation_id, current_user_id
+        )
         if not conv:
-            logger.warning(f"Conversation {conversation_id} not found or user {current_user_id} not participant")
+            logger.warning(
+                f"Conversation {conversation_id} not found or user {current_user_id} not participant"
+            )
             return False
-        
+
         # בדיקה אם כבר נותח (idempotency)
         if await analysis_exists(db, conversation_id):
             logger.info(f"Conversation {conversation_id} already analyzed, skipping")
             return False
-        
+
         # איסוף טקסט השיחה
         chat_text = await get_conversation_text_for_analysis(
             db, conversation_id, current_user_id, limit=100
@@ -49,13 +53,13 @@ async def handle_conversation_completion(
         if not chat_text:
             logger.warning(f"No messages found for conversation {conversation_id}")
             return False
-        
+
         # ניתוח AI
         ride_summary = analyze_conversation(chat_text)
         if not ride_summary:
             logger.error(f"AI analysis failed for conversation {conversation_id}")
             return False
-        
+
         # שמירה ב-DB
         analysis = await create_analysis(
             db=db,
@@ -67,7 +71,7 @@ async def handle_conversation_completion(
             summary_hebrew=ride_summary.summary_hebrew,
             analysis_json=ride_summary.model_dump(),
         )
-        
+
         # שליחת event ל-RabbitMQ (דרך Outbox)
         await publish_to_outbox(
             db=db,
@@ -83,10 +87,12 @@ async def handle_conversation_completion(
                 "summary_hebrew": ride_summary.summary_hebrew,
             },
         )
-        
-        logger.info(f"Conversation {conversation_id} completed and analyzed successfully")
+
+        logger.info(
+            f"Conversation {conversation_id} completed and analyzed successfully"
+        )
         return True
-        
+
     except Exception as e:
         logger.error(f"Error handling conversation completion: {e}", exc_info=True)
         return False

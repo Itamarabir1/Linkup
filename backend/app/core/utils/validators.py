@@ -2,6 +2,7 @@
 מקור אמת יחיד לולידציות: אימות (מייל, סיסמה, טלפון), קבצים (אווטאר), ועוד.
 משמש את domain/auth/schema, api/dependencies/file וכל מקום שדורש ולידציה אחידה בלי כפילות.
 """
+
 import re
 from datetime import datetime, timezone, timedelta
 from typing import TYPE_CHECKING
@@ -16,9 +17,7 @@ except ImportError:
 
 # --- Email ---
 
-EMAIL_REGEX = re.compile(
-    r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
-)
+EMAIL_REGEX = re.compile(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$")
 
 
 def validate_email_format(email: str) -> str:
@@ -79,30 +78,32 @@ def validate_israeli_phone_number(phone: str) -> str:
     """מנקה ומאמת טלפון ישראלי לפורמט 05XXXXXXXX."""
     if not phone:
         raise ValueError("מספר טלפון הוא שדה חובה")
-        
+
     clean_val = re.sub(r"[\s\-]", "", phone)
     pattern = r"^(?:05\d{8}|(?:\+?972)5\d{8})$"
-    
+
     if not re.match(pattern, clean_val):
         raise ValueError("מספר טלפון ישראלי לא תקין")
-    
+
     if clean_val.startswith("+972"):
         clean_val = "0" + clean_val[4:]
     elif clean_val.startswith("972"):
         clean_val = "0" + clean_val[3:]
-        
+
     return clean_val
+
 
 def validate_future_datetime(dt: datetime) -> datetime:
     """בודק שהזמן שנבחר הוא עתידי (UTC)."""
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
-        
+
     now_utc = datetime.now(timezone.utc)
     if dt < now_utc + timedelta(seconds=10):
         raise ValueError("עליך לבחור זמן עתידי")
-        
+
     return dt
+
 
 def validate_israeli_license_plate(plate: str) -> str:
     """מאמת לוחית רישוי (7 או 8 ספרות)."""
@@ -137,7 +138,9 @@ def validate_avatar_file(file: "UploadFile") -> None:
     actual_size = getattr(file, "size", 0) or 0
     if actual_size > max_bytes:
         current_mb = round(actual_size / (1024 * 1024), 2)
-        raise FileTooLargeError(max_size_mb=MAX_AVATAR_SIZE_MB, current_size_mb=current_mb)
+        raise FileTooLargeError(
+            max_size_mb=MAX_AVATAR_SIZE_MB, current_size_mb=current_mb
+        )
 
 
 def slugify_for_avatar(name: str | None) -> str:

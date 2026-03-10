@@ -6,6 +6,7 @@ from app.core.exceptions.infrastructure import InfrastructureError
 
 logger = logging.getLogger(__name__)
 
+
 class RedisClient:
     def __init__(self):
         self.client: redis.Redis = None
@@ -14,9 +15,7 @@ class RedisClient:
     async def connect(self):
         if not self.client:
             self.pool = redis.ConnectionPool.from_url(
-                settings.REDIS_URL,
-                decode_responses=True,
-                max_connections=20
+                settings.REDIS_URL, decode_responses=True, max_connections=20
             )
             self.client = redis.Redis(connection_pool=self.pool)
             logger.info("✅ Redis Client (Caching) initialized.")
@@ -39,9 +38,12 @@ class RedisClient:
             if self.client is None:
                 await self.connect()
             data = await self.client.get(key)
-            if not data: return None
-            try: return json.loads(data)
-            except: return data
+            if not data:
+                return None
+            try:
+                return json.loads(data)
+            except:
+                return data
         except Exception as e:
             raise InfrastructureError(f"Redis GET failed: {key}", detail=str(e))
 
@@ -50,8 +52,6 @@ class RedisClient:
             await self.client.close()
             await self.pool.disconnect()
             logger.info("⚠️ Redis Client connection closed.")
-
-
 
     async def delete(self, key: str) -> bool:
         """

@@ -1,6 +1,5 @@
 import logging
 import re
-import sys
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from fastapi import FastAPI, Request, HTTPException
@@ -21,10 +20,13 @@ logger = logging.getLogger(__name__)
 # CORS: origins ממ-config או FRONTEND_URL (מחשבים לפני יצירת app)
 _cors_origins = getattr(settings, "CORS_ORIGINS", None) or []
 if not _cors_origins:
-    _cors_origins = [getattr(settings, "FRONTEND_URL", "https://linkup.co.il").rstrip("/")]
+    _cors_origins = [
+        getattr(settings, "FRONTEND_URL", "https://linkup.co.il").rstrip("/")
+    ]
 _allow_origin_regex = None
 if getattr(settings, "DEBUG", False):
     _allow_origin_regex = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+
 
 # Middleware שמוסיף CORS לכל תגובה (כולל 500) – רץ ראשון על התגובה
 class EnsureCORSHeadersMiddleware(BaseHTTPMiddleware):
@@ -34,7 +36,9 @@ class EnsureCORSHeadersMiddleware(BaseHTTPMiddleware):
             print("[Linkup] >>> בקשה: {} {}".format(request.method, path), flush=True)
         response = await call_next(request)
         if "/api/v1/" in path:
-            print("[Linkup] <<< תגובה: status={}".format(response.status_code), flush=True)
+            print(
+                "[Linkup] <<< תגובה: status={}".format(response.status_code), flush=True
+            )
         origin = request.headers.get("origin")
         if origin and (
             origin in _cors_origins
@@ -43,6 +47,7 @@ class EnsureCORSHeadersMiddleware(BaseHTTPMiddleware):
             response.headers.setdefault("Access-Control-Allow-Origin", origin)
             response.headers.setdefault("Access-Control-Allow-Credentials", "true")
         return response
+
 
 app = FastAPI(
     title="Linkup API",
@@ -83,7 +88,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         raise exc
     print("[Linkup] !!! שגיאה 500:", type(exc).__name__, str(exc), flush=True)
     logger.exception("Unhandled exception: %s", exc)
-    
+
     # הוספת CORS headers גם לשגיאות
     origin = request.headers.get("origin")
     headers = {}
@@ -95,15 +100,17 @@ async def global_exception_handler(request: Request, exc: Exception):
         headers["Access-Control-Allow-Credentials"] = "true"
         headers["Access-Control-Allow-Methods"] = "*"
         headers["Access-Control-Allow-Headers"] = "*"
-    
+
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error", "type": type(exc).__name__},
         headers=headers,
     )
 
+
 # שים לב! שורה אחת במקום ארבע
 app.include_router(api_router, prefix="/api/v1")
+
 
 @app.get("/", tags=["Health"])
 def read_root():

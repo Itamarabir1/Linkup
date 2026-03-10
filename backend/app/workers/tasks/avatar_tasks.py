@@ -2,6 +2,7 @@
 עיבוד אירועי העלאת ומחיקת אווטאר – תור נפרד (avatar_upload_queue).
 ה-worker מקבל הודעות מ-exchange 'tasks' עם routing_key user.avatar_upload או user.avatar_remove.
 """
+
 import logging
 from typing import Dict, Any
 
@@ -39,7 +40,11 @@ async def _handle_avatar_upload(data: Dict[str, Any]) -> None:
     user_id = data.get("user_id")
     staging_key = data.get("staging_key")
     if user_id is None or not staging_key:
-        logger.error("Invalid avatar_upload payload: user_id=%s, staging_key=%s", user_id, staging_key)
+        logger.error(
+            "Invalid avatar_upload payload: user_id=%s, staging_key=%s",
+            user_id,
+            staging_key,
+        )
         raise ValueError("user_id and staging_key required")
 
     user_id = int(user_id)
@@ -56,9 +61,13 @@ async def _handle_avatar_upload(data: Dict[str, Any]) -> None:
             if old_avatar_url:
                 try:
                     await storage_service.delete_old_avatar(old_avatar_url)
-                    logger.info("Deleted old avatar before finalize: %s", old_avatar_url[:80])
+                    logger.info(
+                        "Deleted old avatar before finalize: %s", old_avatar_url[:80]
+                    )
                 except Exception as e:
-                    logger.warning("Could not delete old avatar URL %s: %s", old_avatar_url[:80], e)
+                    logger.warning(
+                        "Could not delete old avatar URL %s: %s", old_avatar_url[:80], e
+                    )
 
             # גם מוחקים לפי user_id (למקרה של שינוי שם)
             try:
@@ -78,7 +87,7 @@ async def _handle_avatar_upload(data: Dict[str, Any]) -> None:
             await db.refresh(user)
             logger.info("Avatar finalized for user %s: %s", user_id, final_url)
 
-        except Exception as e:
+        except Exception:
             await db.rollback()
             logger.exception("Avatar upload processing failed: user_id=%s", user_id)
             raise
@@ -107,9 +116,9 @@ async def _handle_avatar_remove(data: Dict[str, Any]) -> None:
 
             # מוחק מ-S3 (DB כבר עודכן ב-API)
             await storage_service.delete_avatar_by_user_id(user_id)
-            
+
             logger.info("Avatar removed from S3 for user %s", user_id)
 
-        except Exception as e:
+        except Exception:
             logger.exception("Avatar removal processing failed: user_id=%s", user_id)
             raise

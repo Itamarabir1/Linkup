@@ -1,6 +1,7 @@
 """
 ניתוח AI של שיחות צ'אט באמצעות Groq API.
 """
+
 import json
 import logging
 from groq import APIError
@@ -24,11 +25,11 @@ def _is_retryable_error(exception):
         # Validation או authentication - לא לנסות שוב
         if exception.status_code in [400, 401, 403]:
             return False
-    
+
     # Network errors - ניתן לנסות שוב
     if isinstance(exception, (ConnectionError, TimeoutError)):
         return True
-    
+
     return False
 
 
@@ -36,7 +37,7 @@ def _is_retryable_error(exception):
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=1, max=10),
     retry=retry_if_exception(_is_retryable_error),
-    reraise=True
+    reraise=True,
 )
 def _call_api_with_retry(messages, model, response_format, temperature):
     """קורא ל-Groq API עם retry logic."""
@@ -45,19 +46,21 @@ def _call_api_with_retry(messages, model, response_format, temperature):
         model=model,
         messages=messages,
         response_format=response_format,
-        temperature=temperature
+        temperature=temperature,
     )
     return completion
 
 
-def analyze_conversation(chat_text: str, temperature: float = 0.2) -> RideSummary | None:
+def analyze_conversation(
+    chat_text: str, temperature: float = 0.2
+) -> RideSummary | None:
     """
     מנתח שיחת טרמפ ומחזיר RideSummary.
-    
+
     Args:
         chat_text: טקסט השיחה בין נהג לנוסע
         temperature: טמפרטורה למודל (0.0-2.0). ברירת מחדל 0.2 לחילוץ מדויק
-        
+
     Returns:
         RideSummary אם הצליח, None אם יש שגיאה
     """
@@ -65,24 +68,24 @@ def analyze_conversation(chat_text: str, temperature: float = 0.2) -> RideSummar
         user_message = f"{USER_PROMPT}\n\nConversation:\n{chat_text}"
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_message}
+            {"role": "user", "content": user_message},
         ]
-        
+
         # קריאה ל-API עם retry logic
         completion = _call_api_with_retry(
             messages=messages,
             model="llama-3.3-70b-versatile",
             response_format={"type": "json_object"},
-            temperature=temperature
+            temperature=temperature,
         )
-        
+
         response_content = completion.choices[0].message.content
         response_json = json.loads(response_content)
-        
+
         # אימות שהתשובה תואמת לסכמה
         ride_summary = RideSummary(**response_json)
         return ride_summary
-        
+
     except json.JSONDecodeError as e:
         logger.error(f"JSON decode error in AI analysis: {e}")
         return None

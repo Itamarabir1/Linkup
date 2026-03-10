@@ -1,11 +1,13 @@
 # app/core/exceptions/booking.py
 """שגיאות דומיין הזמנות ונהג/נוסע."""
+
 from typing import Optional
 from .base import LinkupError
 
 
 class RideNotAvailableError(LinkupError):
     """הנסיעה אינה פתוחה להצטרפות או לא נמצאה."""
+
     status_code = 404
     error_code = "BOOKING_RIDE_NOT_AVAILABLE"
     message = "הנסיעה אינה זמינה"
@@ -17,6 +19,7 @@ class RideNotAvailableError(LinkupError):
 
 class BookingAlreadyExistsError(LinkupError):
     """כבר קיימת בקשת הצטרפות לאותה נסיעה."""
+
     status_code = 400
     error_code = "BOOKING_ALREADY_EXISTS"
     message = "כבר ביקשת להצטרף לנסיעה הזו"
@@ -32,6 +35,7 @@ class BookingAlreadyExistsError(LinkupError):
 
 class PassengerRequestNotFoundError(LinkupError):
     """בקשת הנוסע לא נמצאה."""
+
     status_code = 404
     error_code = "BOOKING_REQUEST_NOT_FOUND"
     message = "בקשת הנוסע לא נמצאה"
@@ -43,6 +47,7 @@ class PassengerRequestNotFoundError(LinkupError):
 
 class BookingNotFoundError(LinkupError):
     """הזמנה לא נמצאה."""
+
     status_code = 404
     error_code = "BOOKING_NOT_FOUND"
     message = "הזמנה לא נמצאה"
@@ -54,6 +59,7 @@ class BookingNotFoundError(LinkupError):
 
 class ForbiddenRideActionError(LinkupError):
     """אין הרשאה לבצע פעולה על נסיעה/הזמנה זו."""
+
     status_code = 403
     error_code = "BOOKING_ACCESS_DENIED"
     message = "גישה חסומה"

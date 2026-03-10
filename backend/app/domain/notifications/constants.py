@@ -2,6 +2,7 @@
 Enum של כל אירועי הנוטיפיקציה.
 הערכים חייבים להתאים ל-routing_key שמגיע מ-RabbitMQ (או מאוטבוקס).
 """
+
 from enum import Enum
 
 

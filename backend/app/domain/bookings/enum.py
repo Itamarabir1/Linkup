@@ -8,6 +8,6 @@ class BookingStatus(str, enum.Enum):
     CANCELLED = "cancelled"
     COMPLETED = "completed"
     # סטטוסים לנסיעה פעילה (נהג עם נוסע)
-    EN_ROUTE = "en_route"           # בדרך לנוסע
-    ARRIVED = "arrived"            # הגיע לאיסוף
+    EN_ROUTE = "en_route"  # בדרך לנוסע
+    ARRIVED = "arrived"  # הגיע לאיסוף
     TRIP_IN_PROGRESS = "trip_in_progress"  # הנוסע בפנים

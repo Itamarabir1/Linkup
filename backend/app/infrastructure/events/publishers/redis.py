@@ -2,6 +2,7 @@
 פרסום אירועי צ'אט ל-Redis Pub/Sub – שרת ה-WS (Go) מאזין לערוצים ומוסר ל-WebSocket.
 אין הגדרה מיוחדת ב-Redis – Pub/Sub מובנה בכל Redis.
 """
+
 import json
 import logging
 from typing import Any

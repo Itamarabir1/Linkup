@@ -2,6 +2,7 @@
 מקור אמת יחיד לפרסום אירועים מהדומיין.
 הדומיין לא יודע על RabbitMQ או EventDispatcher – רק כותב ל-Outbox באותה טרנזקציה.
 """
+
 from typing import Any, Dict, List
 from sqlalchemy.ext.asyncio import AsyncSession
 

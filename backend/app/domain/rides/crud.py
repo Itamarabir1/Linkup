@@ -5,31 +5,20 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 from app.domain.rides.enum import RideStatus
-from app.domain.rides.schema import RideCreateInternal # הייבוא של הסכמה המקצועית
-import logging
-from datetime import datetime
-from typing import List, Optional, Dict, Any
-from sqlalchemy.orm import Session
 
-from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-from typing import List
-from datetime import datetime
+
 # --- הייבואים שחסרים לך ---
-from shapely.geometry import Point, LineString
-from geoalchemy2.shape import from_shape
 # ---------------------------
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_
-from datetime import datetime, timedelta
+from sqlalchemy.orm import joinedload
+from datetime import timedelta
 from app.domain.bookings.model import Booking
-from app.domain.users.model import User
 
 
-from app.domain.rides.schema import RideCreateInternal
 from app.domain.rides.model import Ride
+
 logger = logging.getLogger(__name__)
+
 
 class CRUDRide:
     """
@@ -39,23 +28,22 @@ class CRUDRide:
 
     def create(self, db: Session, *, obj_in: Dict[str, Any]) -> Ride:
         """
-    יצירת נסיעה - Clean Version:
-    מקבל מילון מוכן (אחרי Mapper) ושומר אותו.
-    """
-    # 1. יצירת האובייקט ישירות מהמילון 
-    # המילון כבר מכיל origin_geom, destination_geom ו-route_coords כאובייקטים גיאומטריים
+        יצירת נסיעה - Clean Version:
+        מקבל מילון מוכן (אחרי Mapper) ושומר אותו.
+        """
+        # 1. יצירת האובייקט ישירות מהמילון
+        # המילון כבר מכיל origin_geom, destination_geom ו-route_coords כאובייקטים גיאומטריים
         db_obj = Ride(**obj_in)
 
-    # 2. שמירה
+        # 2. שמירה
         db.add(db_obj)
-    
-    # משתמשים ב-flush כדי שהאובייקט יקבל ID מבסיס הנתונים
-    # אבל ה-commit עצמו יקרה בסרוויס (בתוך ה-with db.begin())
-        db.flush() 
-    
+
+        # משתמשים ב-flush כדי שהאובייקט יקבל ID מבסיס הנתונים
+        # אבל ה-commit עצמו יקרה בסרוויס (בתוך ה-with db.begin())
+        db.flush()
+
         db.refresh(db_obj)
         return db_obj
-
 
     def get(self, db: Session, ride_id: int) -> Optional[Ride]:
         """שליפה מהירה לפי מפתח ראשי (Session סינכרוני)."""
@@ -76,21 +64,23 @@ class CRUDRide:
             .first()
         )
 
-    def get_for_update(self, db: Session, ride_id: int, driver_id: Optional[int] = None) -> Optional[Ride]:
+    def get_for_update(
+        self, db: Session, ride_id: int, driver_id: Optional[int] = None
+    ) -> Optional[Ride]:
         """
         Senior Implementation: שליפת נסיעה עם נעילת שורה (FOR UPDATE).
-        
+
         - אם driver_id מסופק: האימות מתבצע ב-DB (מונע גישה למי שאינו הבעלים).
-        - with_for_update(): נועל את השורה עד לסיום הטרנזקציה (Commit/Rollback), 
+        - with_for_update(): נועל את השורה עד לסיום הטרנזקציה (Commit/Rollback),
           מה שמונע מ-Race Conditions לקרות (למשל: נהג ונוסע שמבטלים בו-זמנית).
         """
         # 1. התחלת השאילתה בסינון לפי ה-Primary Key
         query = db.query(Ride).filter(Ride.ride_id == ride_id)
-        
+
         # 2. אימות בעלות ברמת ה-SQL (אם נשלח ID של נהג)
         if driver_id is not None:
             query = query.filter(Ride.driver_id == driver_id)
-            
+
         # 3. ביצוע הנעילה והשליפה
         # חשוב: המתודה מחזירה None אם השורה לא נמצאה (או לא שייכת לנהג)
         return query.with_for_update().first()
@@ -116,7 +106,9 @@ class CRUDRide:
         result = await db.execute(stmt)
         return list(result.scalars().all())
 
-    def update_status(self, db: Session, ride_id: int, status: RideStatus) -> Optional[Ride]:
+    def update_status(
+        self, db: Session, ride_id: int, status: RideStatus
+    ) -> Optional[Ride]:
         """עדכון סטטוס מאובטח (SELECT FOR UPDATE)"""
         ride = self.get_for_update(db, ride_id)
         if ride:
@@ -124,13 +116,15 @@ class CRUDRide:
             db.flush()
         return ride
 
-    def update_seats(self, db: Session, ride_id: int, num_seats_change: int) -> Optional[Ride]:
+    def update_seats(
+        self, db: Session, ride_id: int, num_seats_change: int
+    ) -> Optional[Ride]:
         """עדכון מושבים אטומי עם בדיקת תקינות"""
         ride = self.get_for_update(db, ride_id)
         if ride:
             if ride.available_seats - num_seats_change < 0:
                 raise ValueError("אין מספיק מושבים פנויים")
-                
+
             ride.available_seats -= num_seats_change
             db.flush()
         return ride
@@ -170,22 +164,24 @@ class CRUDRide:
     def get_expired_ids(self, db: Session, now: datetime) -> list[int]:
         """רק מביא את ה-IDs של מה שצריך לסגור"""
         query = db.query(Ride.ride_id).filter(
-            Ride.departure_time < now,
-            Ride.status == RideStatus.OPEN
+            Ride.departure_time < now, Ride.status == RideStatus.OPEN
         )
         return [r.ride_id for r in query.all()]
-    
+
     def bulk_set_completed(self, db: Session, ride_ids: list[int]):
         """מעדכן סטטוס גורף לנסיעות ספציפיות"""
         if not ride_ids:
             return 0
-        return db.query(Ride).filter(Ride.ride_id.in_(ride_ids)).update(
-            {Ride.status: RideStatus.COMPLETED}, 
-            synchronize_session=False
+        return (
+            db.query(Ride)
+            .filter(Ride.ride_id.in_(ride_ids))
+            .update({Ride.status: RideStatus.COMPLETED}, synchronize_session=False)
         )
 
     # --- התיקון כאן: הוספתי self ויישרתי את ההזחה ---
-    def get_bookings_for_reminders(self, db: Session, start_window: datetime, end_window: datetime):
+    def get_bookings_for_reminders(
+        self, db: Session, start_window: datetime, end_window: datetime
+    ):
         """
         שליפת כל ההזמנות המאושרות שזמן האיסוף שלהן חל בחלון הזמן המוגדר.
         """
@@ -193,35 +189,31 @@ class CRUDRide:
             db.query(Booking)
             .options(
                 joinedload(Booking.passenger),
-                joinedload(Booking.ride).joinedload(Ride.driver)
+                joinedload(Booking.ride).joinedload(Ride.driver),
             )
             .filter(
                 and_(
-                    Booking.status == 'confirmed',
+                    Booking.status == "confirmed",
                     Booking.reminder_sent == False,
                     Booking.pickup_time >= start_window,
-                    Booking.pickup_time <= end_window
+                    Booking.pickup_time <= end_window,
                 )
             )
             .all()
         )
 
-
-# בתוך קלאס CRUDRide
+    # בתוך קלאס CRUDRide
     async def get_rides_needing_reminders(
-        self, 
-        db: AsyncSession, 
-        start_window: datetime, 
-        end_window: datetime
+        self, db: AsyncSession, start_window: datetime, end_window: datetime
     ) -> List[Ride]:
         """
         שליפת נסיעות שעומדות לצאת עבור תזכורת לנהג.
-        
+
         Senior Implementation Details:
         1. selectinload: טעינה מקדימה של הנהג בצורה אסינכרונית בטוחה.
         2. Explicit Execute: שימוש ב-db.execute כמתבקש ב-AsyncSession.
         """
-        
+
         # בניית השאילתה (Statement)
         stmt = (
             select(Ride)
@@ -234,18 +226,20 @@ class CRUDRide:
                     Ride.status == RideStatus.OPEN,
                     Ride.reminder_sent == False,
                     Ride.departure_time >= start_window,
-                    Ride.departure_time <= end_window
+                    Ride.departure_time <= end_window,
                 )
             )
         )
 
         # הרצת השאילתה וקבלת התוצאות
         result = await db.execute(stmt)
-        
+
         # scalars() מחלץ את אובייקטי ה-Ride מתוך שורות ה-Result
         return result.scalars().all()
 
-    async def get_for_notification(self, db: AsyncSession, ride_id: int) -> Optional[Ride]:
+    async def get_for_notification(
+        self, db: AsyncSession, ride_id: int
+    ) -> Optional[Ride]:
         """שליפת נסיעה עם נהג (לבניית קונטקסט במייל/פוש)."""
         stmt = (
             select(Ride)

@@ -13,10 +13,11 @@ TEMPLATE_DIR = os.path.join(CURRENT_DIR, "templates")
 # הוספת trim_blocks הופכת את ה-HTML הנקי יותר (בלי שורות ריקות מיותרות)
 env = Environment(
     loader=FileSystemLoader(TEMPLATE_DIR),
-    autoescape=select_autoescape(['html', 'xml']),
+    autoescape=select_autoescape(["html", "xml"]),
     trim_blocks=True,
-    lstrip_blocks=True
+    lstrip_blocks=True,
 )
+
 
 def render_email_template(template_name: str, **context) -> str:
     """טוען קובץ HTML ומזריק לתוכו נתונים"""
@@ -24,12 +25,14 @@ def render_email_template(template_name: str, **context) -> str:
         # Jinja2 תומך בנתיבים יחסיים כמו 'driver/new_ride.html'
         template = env.get_template(template_name)
         return template.render(**context)
-    
+
     except TemplateNotFound:
         # סניור נותן לוג מפורט שיעזור לו ב-3 בלילה להבין מה חסר
-        logger.error(f"❌ Template not found: {template_name} | Searched in: {TEMPLATE_DIR}")
-        return "" # במייל עדיף להחזיר ריק או שגיאה ברורה כדי לא לשלוח ג'יבריש ללקוח
-    
+        logger.error(
+            f"❌ Template not found: {template_name} | Searched in: {TEMPLATE_DIR}"
+        )
+        return ""  # במייל עדיף להחזיר ריק או שגיאה ברורה כדי לא לשלוח ג'יבריש ללקוח
+
     except Exception as e:
         logger.error(f"❌ Rendering error for {template_name}: {str(e)}")
         return ""

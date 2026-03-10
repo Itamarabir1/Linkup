@@ -4,6 +4,7 @@ For local development, create firebase-credentials.json from
 firebase-credentials.example.json and fill in your service account values.
 Do not commit real credentials; the real file is in .gitignore.
 """
+
 import os
 import json
 import logging

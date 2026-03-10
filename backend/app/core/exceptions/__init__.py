@@ -1,5 +1,6 @@
 # app/core/exceptions/__init__.py
 """ייצוא מרכזי של כל שגיאות הדומיין – שימוש: from app.core.exceptions import LinkupError, UserNotFoundError, ..."""
+
 from .base import LinkupError
 
 # Auth

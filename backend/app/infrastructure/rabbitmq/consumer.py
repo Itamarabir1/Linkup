@@ -1,9 +1,7 @@
 import aio_pika
 import json
 import logging
-import asyncio
 from typing import Callable, Awaitable, Dict, Any, Optional, List
-from app.infrastructure.rabbitmq.client import rabbit_client
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +10,7 @@ class RabbitMQConsumer:
     """
     צרכן RabbitMQ. אם מועברת רשימת exchanges – התור נקשרת לכולם (תור אחד לכל המיילים/פוש).
     """
+
     def __init__(
         self,
         rabbit_client,
@@ -62,5 +61,7 @@ class RabbitMQConsumer:
             await callback(payload, message.routing_key)
             await message.ack()
         except Exception as e:
-            logger.error("Failed to process message (nack with requeue): %s", e, exc_info=True)
+            logger.error(
+                "Failed to process message (nack with requeue): %s", e, exc_info=True
+            )
             await message.nack(requeue=True)

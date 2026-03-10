@@ -2,6 +2,7 @@
 שירות צ'אט 1:1 – לוגיקה מעל CRUD, בניית תשובות (partner, last message).
 אחרי שמירת הודעה – מפרסם ל-Redis Pub/Sub (שרת ה-WS ב-Go מאזין).
 """
+
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -40,27 +41,25 @@ async def can_chat_about_booking(
     booking = result.scalars().first()
     if not booking:
         return False, None
-    
+
     # Load ride to get driver_id
-    ride_result = await db.execute(
-        select(Ride).where(Ride.ride_id == booking.ride_id)
-    )
+    ride_result = await db.execute(select(Ride).where(Ride.ride_id == booking.ride_id))
     ride = ride_result.scalars().first()
     if not ride:
         return False, None
-    
+
     # Check if current user is driver or passenger
     is_driver = ride.driver_id == current_user_id
     is_passenger = booking.passenger_id == current_user_id
-    
+
     if not (is_driver or is_passenger):
         return False, None
-    
+
     # Check status: only pending_approval or confirmed allow chat
     allowed_statuses = {BookingStatus.PENDING, BookingStatus.CONFIRMED}
     if booking.status not in allowed_statuses:
         return False, booking
-    
+
     return True, booking
 
 
@@ -107,28 +106,26 @@ async def get_or_create_conversation_by_booking(
             "You can only chat with the driver/passenger of a booking "
             "if the booking status is pending_approval or confirmed"
         )
-    
+
     # Get the other user (driver if current is passenger, passenger if current is driver)
-    ride_result = await db.execute(
-        select(Ride).where(Ride.ride_id == booking.ride_id)
-    )
+    ride_result = await db.execute(select(Ride).where(Ride.ride_id == booking.ride_id))
     ride = ride_result.scalars().first()
     if not ride:
         raise ValueError("Ride not found")
-    
+
     driver_id = ride.driver_id
     passenger_id = booking.passenger_id
-    
+
     # Determine the other user
     other_user_id = driver_id if current_user_id == passenger_id else passenger_id
-    
+
     if other_user_id == current_user_id:
         raise ValueError("Cannot start conversation with yourself")
-    
+
     other = await crud_user.get_by_id(db, id=other_user_id)
     if not other:
         raise ValueError("Other user not found")
-    
+
     conv = await chat_crud.get_or_create_conversation(
         db, current_user_id, other_user_id
     )
@@ -164,7 +161,9 @@ async def list_my_conversations(
     convs = await chat_crud.list_conversations_for_user(db, current_user_id)
     out = []
     for conv in convs:
-        partner_user_id = conv.user_id_2 if conv.user_id_1 == current_user_id else conv.user_id_1
+        partner_user_id = (
+            conv.user_id_2 if conv.user_id_1 == current_user_id else conv.user_id_1
+        )
         partner_user = conv.user_2 if conv.user_id_1 == current_user_id else conv.user_1
         partner = ConversationPartner(
             user_id=partner_user.user_id,
@@ -177,21 +176,21 @@ async def list_my_conversations(
                 conversation_id=conv.conversation_id,
                 partner=partner,
                 last_message_at=last.created_at if last else None,
-                last_message_preview=(last.body[:80] + "…") if last and len(last.body) > 80 else (last.body if last else None),
+                last_message_preview=(last.body[:80] + "…")
+                if last and len(last.body) > 80
+                else (last.body if last else None),
             )
         )
     return out
 
 
 async def get_conversation_detail(
-  db: AsyncSession, conversation_id: int, current_user_id: int
+    db: AsyncSession, conversation_id: int, current_user_id: int
 ) -> ConversationDetail | None:
     """
     פרטי שיחה אחת – רק אם המשתמש participant.
     """
-    conv = await chat_crud.get_conversation_by_id(
-        db, conversation_id, current_user_id
-    )
+    conv = await chat_crud.get_conversation_by_id(db, conversation_id, current_user_id)
     if not conv:
         return None
     partner = _partner_from_conversation(conv, current_user_id)
@@ -203,10 +202,10 @@ async def get_conversation_detail(
 
 
 async def send_message(
-  db: AsyncSession,
-  conversation_id: int,
-  sender_id: int,
-  body: str,
+    db: AsyncSession,
+    conversation_id: int,
+    sender_id: int,
+    body: str,
 ) -> MessageResponse | None:
     """
     שולח הודעה בשיחה: שמירה ב-DB + פרסום ל-Redis (שרת ה-WS ב-Go מאזין).
@@ -214,11 +213,11 @@ async def send_message(
     מחזיר MessageResponse אם המשתמש participant והשיחה קיימת.
     """
     from app.domain.chat.completion.detector import is_conversation_completion_message
-    from app.infrastructure.redis.chat_completion_publish import publish_chat_completion_event
-
-    conv = await chat_crud.get_conversation_by_id(
-        db, conversation_id, sender_id
+    from app.infrastructure.redis.chat_completion_publish import (
+        publish_chat_completion_event,
     )
+
+    conv = await chat_crud.get_conversation_by_id(db, conversation_id, sender_id)
     if not conv:
         return None
     msg = await chat_crud.create_message(
@@ -234,7 +233,7 @@ async def send_message(
         "created_at": msg.created_at.isoformat() if msg.created_at else None,
     }
     await publish_chat_message(conversation_id, payload)
-    
+
     # בדיקה אם זו הודעת סיום — מפרסם ל-Redis DB=1; worker יטפל בניתוח AI
     if is_conversation_completion_message(body):
         try:
@@ -252,22 +251,21 @@ async def send_message(
 
 
 async def get_messages(
-  db: AsyncSession,
-  conversation_id: int,
-  current_user_id: int,
-  limit: int = 50,
-  before_message_id: int | None = None,
+    db: AsyncSession,
+    conversation_id: int,
+    current_user_id: int,
+    limit: int = 50,
+    before_message_id: int | None = None,
 ) -> list[MessageResponse] | None:
     """
     היסטוריית הודעות בשיחה (pagination). None אם המשתמש לא participant.
     """
-    conv = await chat_crud.get_conversation_by_id(
-        db, conversation_id, current_user_id
-    )
+    conv = await chat_crud.get_conversation_by_id(db, conversation_id, current_user_id)
     if not conv:
         return None
     messages = await chat_crud.get_messages(
-        db, conversation_id=conversation_id,
+        db,
+        conversation_id=conversation_id,
         limit=limit,
         before_message_id=before_message_id,
     )

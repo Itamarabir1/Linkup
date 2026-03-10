@@ -6,7 +6,6 @@ CONTEXT_MAP = {
     "ride_cancelled": RideContextBuilder(),
     "new_ride_request": RideContextBuilder(),
     "ride_started": RideContextBuilder(),
-
     # אירועי הזמנה - כולם משתמשים ב-BookingContextBuilder כי הם מקבלים אובייקט Booking
     "booking_confirmed": BookingContextBuilder(),
     "booking_rejected": BookingContextBuilder(),

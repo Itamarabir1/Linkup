@@ -21,7 +21,6 @@ from app.domain.rides.model import Ride
 from app.domain.bookings.model import Booking
 from app.domain.bookings.enum import BookingStatus
 from app.domain.rides.enum import RideStatus
-from app.domain.passengers.enum import PassengerStatus
 from app.domain.bookings.schema import (
     BookingManifestItem,
     RideManifestResponse,
@@ -51,7 +50,9 @@ def _request_to_join_sync(
     if p_req.passenger_id != current_user_id:
         raise ForbiddenRideActionError("הבקשה אינה שייכת למשתמש המחובר")
     # מניעת כפילות: אותו נוסע לא יכול לשלוח יותר מבקשה אחת פעילה לאותה נסיעה (unique_passenger_per_ride)
-    existing = crud_booking.get_booking_by_ride_and_passenger(sess, ride_id, p_req.passenger_id)
+    existing = crud_booking.get_booking_by_ride_and_passenger(
+        sess, ride_id, p_req.passenger_id
+    )
     if existing:
         if existing.status in (BookingStatus.CANCELLED, BookingStatus.REJECTED):
             return crud_booking.reuse_booking_after_rejection_or_cancellation(
@@ -71,14 +72,22 @@ def _cancel_ride_sync(sess: Session, ride_id: int, driver_id: int) -> list:
     if not ride or ride.driver_id != driver_id:
         raise ForbiddenRideActionError("אינך מורשה לבטל נסיעה זו")
     req_ids = crud_booking.get_request_ids_for_ride(sess, ride_id)
-    logger.info("cancel_ride: updating bookings to status=%s for ride_id=%s", BookingStatus.CANCELLED.value, ride_id)
+    logger.info(
+        "cancel_ride: updating bookings to status=%s for ride_id=%s",
+        BookingStatus.CANCELLED.value,
+        ride_id,
+    )
     crud_booking.bulk_update_bookings_status(sess, ride_id, BookingStatus.CANCELLED)
     # אחרי ביטול כל ה-bookings של הנסיעה, מחשבים מחדש סטטוס לכל בקשת נוסע
     # (כדי לא לדרוס סטטוס אם לאותה בקשה יש bookings נוספים על נסיעות אחרות)
     if req_ids:
         for rid in sorted(set([r for r in req_ids if r is not None])):
             crud_booking.update_passenger_request_status_from_bookings(sess, rid)
-    logger.info("cancel_ride: updating ride to status=%s for ride_id=%s", RideStatus.CANCELLED.value, ride_id)
+    logger.info(
+        "cancel_ride: updating ride to status=%s for ride_id=%s",
+        RideStatus.CANCELLED.value,
+        ride_id,
+    )
     # PostgreSQL ride_status enum expects lowercase 'cancelled'; ORM would send enum name 'CANCELLED'
     sess.execute(
         text(
@@ -91,7 +100,6 @@ def _cancel_ride_sync(sess: Session, ride_id: int, driver_id: int) -> list:
 
 
 class BookingService:
-
     @staticmethod
     async def request_to_join(
         db: AsyncSession,
@@ -115,16 +123,29 @@ class BookingService:
                 {"booking_id": new_booking.booking_id},
                 [DispatchTarget.RABBITMQ.value],
             )
-            print(f"[NOTIF] API: wrote to outbox booking_id={new_booking.booking_id}", flush=True)
-            logger.info("[NOTIF] API: wrote to outbox event=booking.passenger_join_request booking_id=%s", new_booking.booking_id)
+            print(
+                f"[NOTIF] API: wrote to outbox booking_id={new_booking.booking_id}",
+                flush=True,
+            )
+            logger.info(
+                "[NOTIF] API: wrote to outbox event=booking.passenger_join_request booking_id=%s",
+                new_booking.booking_id,
+            )
             await db.commit()
             # Reload booking with relationships loaded for proper serialization
-            booking_with_relations = await crud_booking.get_async(db, new_booking.booking_id)
+            booking_with_relations = await crud_booking.get_async(
+                db, new_booking.booking_id
+            )
             if booking_with_relations:
                 return booking_with_relations
             await db.refresh(new_booking)
             return new_booking
-        except (RideNotAvailableError, BookingAlreadyExistsError, PassengerRequestNotFoundError, ForbiddenRideActionError):
+        except (
+            RideNotAvailableError,
+            BookingAlreadyExistsError,
+            PassengerRequestNotFoundError,
+            ForbiddenRideActionError,
+        ):
             await db.rollback()
             raise
         except Exception as e:
@@ -150,7 +171,9 @@ class BookingService:
                     [DispatchTarget.RABBITMQ.value],
                 )
             except Exception as e:
-                logger.warning("Outbox publish failed (ride cancel will still commit): %s", e)
+                logger.warning(
+                    "Outbox publish failed (ride cancel will still commit): %s", e
+                )
             await db.commit()
         except ForbiddenRideActionError:
             await db.rollback()
@@ -165,16 +188,17 @@ class BookingService:
         db: AsyncSession, ride_id: int, driver_id: int
     ) -> RideManifestResponse:
         """הפקת רשימת נוסעים מאושרים עבור הנהג"""
+
         def _sync(sess: Session):
             ride = sess.get(Ride, ride_id)
             if not ride or ride.driver_id != driver_id:
                 raise ForbiddenRideActionError("גישה חסומה")
-            
+
             # שליפת כל ה-bookings (לא רק CONFIRMED, כדי שהפרונט יוכל לסנן)
             bookings = crud_booking.get_ride_bookings_by_status(
                 sess, ride_id, BookingStatus.CONFIRMED
             )
-            
+
             manifest = []
             total_confirmed_seats = 0
             for b in bookings:
@@ -184,31 +208,34 @@ class BookingService:
                 clean_phone = "".join(filter(str.isdigit, user.phone_number or ""))
                 if clean_phone.startswith("0"):
                     clean_phone = "972" + clean_phone[1:]
-                manifest.append({
-                    "booking_id": b.booking_id,
-                    "passenger_id": user.user_id,
-                    "passenger_name": user.full_name,
-                    "phone": user.phone_number or "",
-                    "whatsapp_link": f"https://wa.me/{clean_phone}?text={quote('היי, אני הנהג שלך מהאפליקציה')}",
-                    "num_seats": b.num_seats,
-                    "status": b.status,
-                    "reminder_sent": b.reminder_sent,
-                    "pickup_name": b.pickup_name,
-                    "pickup_time": b.pickup_time,
-                })
+                manifest.append(
+                    {
+                        "booking_id": b.booking_id,
+                        "passenger_id": user.user_id,
+                        "passenger_name": user.full_name,
+                        "phone": user.phone_number or "",
+                        "whatsapp_link": f"https://wa.me/{clean_phone}?text={quote('היי, אני הנהג שלך מהאפליקציה')}",
+                        "num_seats": b.num_seats,
+                        "status": b.status,
+                        "reminder_sent": b.reminder_sent,
+                        "pickup_name": b.pickup_name,
+                        "pickup_time": b.pickup_time,
+                    }
+                )
                 total_confirmed_seats += b.num_seats
-            
+
             # חישוב מושבים פנויים (הנחה: available_seats הוא המקסימום, ואנחנו מחסירים את מה שכבר תפוס)
             # אבל צריך לבדוק מה המקסימום - אולי זה 4 או משהו אחר
             # בינתיים נשתמש ב-available_seats כ-המושבים שנותרו
             available_seats_left = max(0, ride.available_seats)
-            
+
             return RideManifestResponse(
                 ride_id=ride_id,
                 total_confirmed_passengers=len(manifest),
                 available_seats_left=available_seats_left,
                 passengers=[BookingManifestItem(**item) for item in manifest],
             )
+
         result = await db.run_sync(_sync)
         return result
 
@@ -235,6 +262,7 @@ class BookingService:
         db: AsyncSession, booking_id: int, driver_id: int
     ) -> Booking:
         """אישור הזמנה על ידי נהג. מפרסם לאוטבוקס – הנוסע יקבל מייל ופוש."""
+
         def _sync(sess: Session):
             booking = crud_booking.get_booking_by_id(sess, booking_id)
             if not booking:
@@ -245,6 +273,7 @@ class BookingService:
             crud_booking.execute_booking_approval(sess, booking)
             sess.flush()
             return crud_booking.get_booking_by_id(sess, booking_id)
+
         try:
             booking = await db.run_sync(_sync)
             await publish_to_outbox(
@@ -265,6 +294,7 @@ class BookingService:
         db: AsyncSession, booking_id: int, driver_id: int
     ) -> Booking:
         """דחיית הזמנה על ידי נהג. מפרסם לאוטבוקס – הנוסע יקבל מייל ופוש."""
+
         def _sync(sess: Session):
             booking = crud_booking.get_booking_by_id(sess, booking_id)
             if not booking:
@@ -275,6 +305,7 @@ class BookingService:
             crud_booking.execute_booking_rejection(sess, booking)
             sess.flush()
             return crud_booking.get_booking_by_id(sess, booking_id)
+
         try:
             booking = await db.run_sync(_sync)
             await publish_to_outbox(
@@ -291,8 +322,11 @@ class BookingService:
             raise
 
     @staticmethod
-    async def cancel_booking(db: AsyncSession, booking_id: int, current_user_id: int) -> Booking:
+    async def cancel_booking(
+        db: AsyncSession, booking_id: int, current_user_id: int
+    ) -> Booking:
         """ביטול הזמנה (נוסע או נהג) – עם בדיקת הרשאות."""
+
         def _sync(sess: Session):
             booking = crud_booking.get_booking_by_id(sess, booking_id)
             if not booking:
@@ -305,6 +339,7 @@ class BookingService:
             crud_booking.execute_booking_cancellation(sess, booking)
             sess.flush()
             return crud_booking.get_booking_by_id(sess, booking_id)
+
         try:
             booking = await db.run_sync(_sync)
             await db.commit()
@@ -324,10 +359,9 @@ class BookingService:
         )
 
     @staticmethod
-    async def get_pending_requests(
-        db: AsyncSession, ride_id: int, driver_id: int
-    ):
+    async def get_pending_requests(db: AsyncSession, ride_id: int, driver_id: int):
         """שליפת בקשות הממתינות לאישור עבור נסיעה מסוימת"""
+
         def _sync(sess: Session):
             ride = sess.get(Ride, ride_id)
             if not ride or ride.driver_id != driver_id:
@@ -335,28 +369,34 @@ class BookingService:
             return crud_booking.get_ride_bookings_by_status(
                 sess, ride_id, BookingStatus.PENDING
             )
+
         return await db.run_sync(_sync)
 
     @staticmethod
-    async def get_active_bookings_for_driver(
-        db: AsyncSession, driver_id: int
-    ):
+    async def get_active_bookings_for_driver(db: AsyncSession, driver_id: int):
         """בוקינגים שבהם הנהג כרגע בביצוע מול נוסע."""
+
         def _sync(sess: Session):
-            return sess.query(Booking).join(Ride).filter(
-                Ride.driver_id == driver_id,
-                Booking.status.in_([
-                    BookingStatus.EN_ROUTE,
-                    BookingStatus.ARRIVED,
-                    BookingStatus.TRIP_IN_PROGRESS,
-                ]),
-            ).all()
+            return (
+                sess.query(Booking)
+                .join(Ride)
+                .filter(
+                    Ride.driver_id == driver_id,
+                    Booking.status.in_(
+                        [
+                            BookingStatus.EN_ROUTE,
+                            BookingStatus.ARRIVED,
+                            BookingStatus.TRIP_IN_PROGRESS,
+                        ]
+                    ),
+                )
+                .all()
+            )
+
         return await db.run_sync(_sync)
 
     @staticmethod
-    async def get_history_with_stats(
-        db: AsyncSession, user_id: int, role: str
-    ):
+    async def get_history_with_stats(db: AsyncSession, user_id: int, role: str):
         trips = await db.run_sync(
             lambda sess: crud_booking.get_user_history(sess, user_id=user_id, role=role)
         )
@@ -382,12 +422,16 @@ class BookingService:
                 ride = b.ride
                 other = None
                 if b.passenger_request and b.passenger_request.user:
-                    other = getattr(b.passenger_request.user, "full_name", None) or "נוסע"
+                    other = (
+                        getattr(b.passenger_request.user, "full_name", None) or "נוסע"
+                    )
                 items.append(
                     NotificationItemResponse(
                         type="ride_request",
                         title="בקשה להצטרפות לנסיעה",
-                        body=f"{other or 'נוסע'} מבקש להצטרף לנסיעה" if other else "בקשה להצטרפות",
+                        body=f"{other or 'נוסע'} מבקש להצטרף לנסיעה"
+                        if other
+                        else "בקשה להצטרפות",
                         created_at=b.created_at,
                         booking_id=b.booking_id,
                         ride_id=b.ride_id,
@@ -403,7 +447,9 @@ class BookingService:
                 driver_name = None
                 if ride and getattr(ride, "driver", None):
                     driver_name = getattr(ride.driver, "full_name", None) or "הנהג"
-                status_val = getattr(b.status, "value", str(b.status)) if b.status else None
+                status_val = (
+                    getattr(b.status, "value", str(b.status)) if b.status else None
+                )
                 if status_val == BookingStatus.CONFIRMED.value:
                     ntype, title = "booking_confirmed", "אישור לנסיעה"
                     body = f"{driver_name or 'הנהג'} אישר את בקשתך"
@@ -412,7 +458,7 @@ class BookingService:
                     body = f"{driver_name or 'הנהג'} דחה את בקשתך"
                 else:
                     ntype, title = "pending_approval", "בקשתך ממתינה"
-                    body = f"בקשתך לנסיעה ממתינה לאישור הנהג"
+                    body = "בקשתך לנסיעה ממתינה לאישור הנהג"
                 items.append(
                     NotificationItemResponse(
                         type=ntype,
@@ -422,8 +468,12 @@ class BookingService:
                         booking_id=b.booking_id,
                         ride_id=b.ride_id,
                         other_party_name=driver_name,
-                        ride_origin=getattr(ride, "origin_name", None) if ride else None,
-                        ride_destination=getattr(ride, "destination_name", None) if ride else None,
+                        ride_origin=getattr(ride, "origin_name", None)
+                        if ride
+                        else None,
+                        ride_destination=getattr(ride, "destination_name", None)
+                        if ride
+                        else None,
                         status=status_val,
                     )
                 )

@@ -1,6 +1,7 @@
 """
 Rate limiting ל-endpoints רגישים (login, refresh, password-reset) – הגבלה לפי IP.
 """
+
 from fastapi import Request, HTTPException, status
 
 from app.core.config import settings
@@ -25,7 +26,9 @@ async def rate_limit_auth(request: Request) -> None:
     window = getattr(settings, "RATE_LIMIT_AUTH_WINDOW_SECONDS", 60)
     max_req = getattr(settings, "RATE_LIMIT_AUTH_MAX_REQUESTS", 10)
 
-    allowed = await redis_client.rate_limit_check(key, window_seconds=window, max_count=max_req)
+    allowed = await redis_client.rate_limit_check(
+        key, window_seconds=window, max_count=max_req
+    )
     if not allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

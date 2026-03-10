@@ -2,11 +2,14 @@ from pydantic import BaseModel, ConfigDict, Field
 from datetime import datetime
 from typing import Optional, List
 from app.domain.bookings.enum import BookingStatus
+
+
 # 1. יצירת בקשת הצטרפות - נשאר ללא שינוי (המשתמש לא שולח reminder_sent)
 class BookingCreate(BaseModel):
     ride_id: int
     request_id: int
     num_seats: int = Field(default=1, ge=1)
+
 
 # 2. מה חוזר מהשרת (Response כללי) - עודכן!
 class BookingResponse(BaseModel):
@@ -17,13 +20,14 @@ class BookingResponse(BaseModel):
     num_seats: int
     status: BookingStatus
     # --- השדה החדש ---
-    reminder_sent: bool 
+    reminder_sent: bool
     created_at: datetime
-    
+
     passenger_name: Optional[str] = None
     phone: Optional[str] = None
-    
+
     model_config = ConfigDict(from_attributes=True)
+
 
 # 3. סכימה עבור הנהג (המניפסט) - עודכן!
 class BookingManifestItem(BaseModel):
@@ -39,8 +43,9 @@ class BookingManifestItem(BaseModel):
     # פרטי תחנת עלייה ושעה
     pickup_name: Optional[str] = None
     pickup_time: Optional[datetime] = None
-    
+
     model_config = ConfigDict(from_attributes=True)
+
 
 # 4. תגובה מרוכזת של המניפסט - ללא שינוי
 class RideManifestResponse(BaseModel):
@@ -51,6 +56,7 @@ class RideManifestResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 # 5. סכימה קצרה לניהול בקשות - עודכן!
 class BookingShortInfo(BaseModel):
     booking_id: int
@@ -59,18 +65,20 @@ class BookingShortInfo(BaseModel):
     num_seats: int
     status: BookingStatus
     # הוספנו כאן למען השקיפות בניהול
-    reminder_sent: bool 
+    reminder_sent: bool
     created_at: datetime
-    
+
+
 class TripStats(BaseModel):
     count: int
     total_km: float
     total_hours: float
 
+
 class TripHistoryResponse(BaseModel):
     trips: List[BookingResponse]
     stats: TripStats
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 

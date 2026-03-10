@@ -2,6 +2,7 @@
 לקוח S3 (aioboto3) – העלאה, העתקה ומחיקה.
 משמש את StorageService להעלאת אווטאר (staging → finalize).
 """
+
 import logging
 from urllib.parse import quote
 from aioboto3 import Session
@@ -33,7 +34,9 @@ class S3Client:
                     file_data,
                     self.bucket_name,
                     key,
-                    ExtraArgs={"ContentType": content_type or "application/octet-stream"},
+                    ExtraArgs={
+                        "ContentType": content_type or "application/octet-stream"
+                    },
                 )
             return self._public_url(key)
         except Exception as e:
@@ -62,7 +65,13 @@ class S3Client:
                 await s3.delete_object(Bucket=self.bucket_name, Key=key)
             logger.info("S3 delete_object OK: bucket=%s key=%s", self.bucket_name, key)
         except Exception as e:
-            logger.error("S3 delete failed bucket=%s key=%s: %s", self.bucket_name, key, e, exc_info=True)
+            logger.error(
+                "S3 delete failed bucket=%s key=%s: %s",
+                self.bucket_name,
+                key,
+                e,
+                exc_info=True,
+            )
             raise
 
     async def list_objects_by_prefix(self, prefix: str) -> list[str]:
@@ -71,13 +80,17 @@ class S3Client:
         try:
             async with self._session.client("s3") as s3:
                 paginator = s3.get_paginator("list_objects_v2")
-                async for page in paginator.paginate(Bucket=self.bucket_name, Prefix=prefix):
+                async for page in paginator.paginate(
+                    Bucket=self.bucket_name, Prefix=prefix
+                ):
                     for obj in page.get("Contents") or []:
                         k = obj.get("Key")
                         if k:
                             keys.append(k)
         except Exception as e:
-            logger.error("S3 list_objects failed prefix=%s: %s", prefix, e, exc_info=True)
+            logger.error(
+                "S3 list_objects failed prefix=%s: %s", prefix, e, exc_info=True
+            )
             raise
         return keys
 
@@ -102,11 +115,19 @@ class S3Client:
                     },
                     ExpiresIn=expiration,
                 )
-                logger.info("Generated presigned URL for key=%s (expires in %ds)", key, expiration)
+                logger.info(
+                    "Generated presigned URL for key=%s (expires in %ds)",
+                    key,
+                    expiration,
+                )
                 return presigned_url
         except Exception as e:
-            logger.error("Failed to generate presigned URL for key=%s: %s", key, e, exc_info=True)
-            raise StorageServiceError(payload={"detail": f"Failed to generate presigned URL: {str(e)}"}) from e
+            logger.error(
+                "Failed to generate presigned URL for key=%s: %s", key, e, exc_info=True
+            )
+            raise StorageServiceError(
+                payload={"detail": f"Failed to generate presigned URL: {str(e)}"}
+            ) from e
 
 
 s3_client = S3Client()

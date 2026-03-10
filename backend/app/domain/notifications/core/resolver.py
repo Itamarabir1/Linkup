@@ -2,6 +2,7 @@
 זיהוי נמען להודעות – לפי event_key ו־source.
 הקריאה חייבת להעביר source עם relationships טעונים (driver, passenger, passenger_request.user).
 """
+
 import logging
 from typing import Any, Optional
 from app.core.exceptions.base import LinkupError
@@ -11,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 class ResolverError(LinkupError):
     """שגיאה בזיהוי נמען."""
+
     def __init__(self, message: str):
         super().__init__(message, status_code=500)
 
@@ -32,6 +34,7 @@ class RecipientResolver:
         strategy["role"] קובע: self → source הוא User; driver → נהג מה־Ride/Booking; passenger → נוסע מה־Booking.
         """
         from app.domain.notifications.config.mappings import NOTIFICATION_STRATEGY
+
         strategy = NOTIFICATION_STRATEGY.get(event_key)
         if not strategy:
             logger.warning("No strategy for event_key=%s", event_key)
@@ -77,10 +80,13 @@ class RecipientResolver:
             return None
         if hasattr(source, "passenger") and source.passenger is not None:
             return source.passenger
-        if hasattr(source, "passenger_request") and source.passenger_request is not None:
+        if (
+            hasattr(source, "passenger_request")
+            and source.passenger_request is not None
+        ):
             return getattr(source.passenger_request, "user", None)
         return None
-    
+
     def _get_both(self, source: Any) -> Optional[Any]:
         """
         role=both: source הוא payload dict עם user_id_1 ו-user_id_2.

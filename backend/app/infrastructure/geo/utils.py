@@ -27,6 +27,7 @@ def to_geo_point(lat: float, lon: float, srid: int = 4326):
     """
     return from_shape(Point(lon, lat), srid=srid)
 
+
 def to_geo_line(coords: List[Tuple[float, float]], srid: int = 4326):
     """
     Technical utility to convert a list of points to a PostGIS LineString.
