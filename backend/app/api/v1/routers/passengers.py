@@ -144,12 +144,14 @@ async def request_ride_from_search(
         # אם אין request_id, יצור אחד (edge case - לא אמור לקרות אם החיפוש עובד נכון)
         if not request_id:
             new_request = await db.run_sync(
-                lambda sync_db: PassengerService.create_passenger_request_for_ride_search(
-                    sync_db,
-                    passenger_id=current_user.user_id,
-                    pickup_name=body.pickup_name,
-                    destination_name=body.destination_name,
-                    num_seats=body.num_seats,
+                lambda sync_db: (
+                    PassengerService.create_passenger_request_for_ride_search(
+                        sync_db,
+                        passenger_id=current_user.user_id,
+                        pickup_name=body.pickup_name,
+                        destination_name=body.destination_name,
+                        num_seats=body.num_seats,
+                    )
                 )
             )
             request_id = new_request.request_id
