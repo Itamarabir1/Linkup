@@ -18,7 +18,8 @@ jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -29,6 +30,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      # שלב הנורמליזציה: הופך סיומות שורות של Windows (CRLF) ל-Linux (LF)
+      # זה פותר את השגיאה ב-Ruff בלי לשנות את הקוד שלך בפועל
+      - name: Normalize line endings
+        run: find app/ -type f -name "*.py" -exec sed -i 's/\r$//' {} +
 
       - name: Lint (ruff)
         run: ruff check app/
