@@ -1,7 +1,3 @@
-# hello world
-
-
-
 import logging
 from datetime import datetime
 from typing import List, Optional
@@ -18,8 +14,6 @@ from app.core.exceptions.booking import (
     PassengerRequestNotFoundError,
     RideNotAvailableError,
 )
-
-
 
 from app.core.exceptions.infrastructure import GeocodingError
 from app.domain.bookings.schema import BookingResponse
@@ -248,4 +242,3 @@ def get_all_rides_admin(
 ):
     """מחזיר את כל הנסיעות במערכת. אם נשלח סטטוס, יחזיר רק נסיעות בסטטוס הזה."""
     return PassengerService.get_all_rides_for_admin(db, status=filter_status)
-print("hello world hbjkbkdbsj")    
