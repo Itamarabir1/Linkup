@@ -31,10 +31,6 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # זה השלב שפותר את הבעיה - הוא "מנקה" את הקבצים בשרת לפני הבדיקה
-      - name: Normalize line endings
-        run: find app/ -type f -name "*.py" -exec sed -i 's/\r$//' {} +
-
       - name: Lint (ruff)
         run: ruff check app/
 
