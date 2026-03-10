@@ -39,7 +39,9 @@ jobs:
         run: ruff check app/
 
       - name: Format check (ruff)
-        run: ruff format --check app/
+        run: |
+          ruff format app/
+          git diff --exit-code
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
