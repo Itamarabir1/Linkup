@@ -70,7 +70,7 @@ flowchart LR
 | **Frontend**  | React, TypeScript, Vite, Google Maps |
 | **Mobile**    | React Native, Expo, TypeScript |
 | **Infrastructure** | Docker, Docker Compose, Kubernetes (manifests in repo) |
-| **Cloud / CI**| Render, GitHub Actions (backend, chat-ws, frontend) |
+| **Cloud / CI** | GitHub Actions, GHCR (GitHub Container Registry), Docker |
 
 ---
 
@@ -154,8 +154,16 @@ Apply the database schema once (see `db/schema.sql`) and run migrations: `cd bac
 
 ## CI/CD
 
-- **Backend:** GitHub Actions — lint (Ruff), tests (pytest). Workflow: `.github/workflows/backend-ci.yml`.
-- **chat-ws:** GitHub Actions — dependency download, build, vet. Workflow: `.github/workflows/chat-ws-ci.yml`.
-- **Frontend:** GitHub Actions — install, lint, build. Workflow: `.github/workflows/frontend-ci.yml`.
+All three services have GitHub Actions workflows that run on 
+push to `main` or `develop` (only when relevant files change).
 
-Production-style deployment is defined in `render.yaml` (Render) and in `k8s/` for Kubernetes.
+| Service   | Workflow | Steps |
+|-----------|----------|-------|
+| backend   | `backend-ci.yml`  | lint (Ruff), format check, tests (pytest), Docker build → push to GHCR |
+| chat-ws   | `chat-ws-ci.yml`  | build, vet, go test, Docker build → push to GHCR |
+| frontend  | `frontend-ci.yml` | lint, type check, build, Docker build → push to GHCR |
+
+Docker images are published to GitHub Container Registry on every push to `main`:
+- `ghcr.io/Itamarabir1/linkup-backend:latest`
+- `ghcr.io/Itamarabir1/linkup-chat-ws:latest`
+- `ghcr.io/Itamarabir1/linkup-frontend:latest`
