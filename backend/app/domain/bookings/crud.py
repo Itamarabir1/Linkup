@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from uuid import UUID
 from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
@@ -23,8 +24,9 @@ class CRUDBooking:
 
     # --- שליפות (Queries) ---
 
-    def get_booking_by_id(self, db: Session, booking_id: int) -> Optional[Booking]:
+    def get_booking_by_id(self, db: Session, booking_id: UUID) -> Optional[Booking]:
         """עדכון שליפת בוקינג בודד (למשל לאישור הזמנה) – עם ride, driver, passenger_request, user, passenger (User)."""
+        bid = UUID(str(booking_id)) if isinstance(booking_id, str) else booking_id
         return (
             db.query(Booking)
             .options(
@@ -32,12 +34,12 @@ class CRUDBooking:
                 joinedload(Booking.passenger_request).joinedload(PassengerRequest.user),
                 joinedload(Booking.passenger),
             )
-            .filter(Booking.booking_id == booking_id)
+            .filter(Booking.booking_id == bid)
             .first()
         )
 
     async def get(
-        self, db: AsyncSession, *, id: int = None, booking_id: int = None
+        self, db: AsyncSession, *, id: Optional[UUID] = None, booking_id: Optional[UUID] = None
     ) -> Optional[Booking]:
         """שליפה אסינכרונית להזמנה (לנוטיפיקציות). מקבל id= או booking_id=."""
         bid = id or booking_id
@@ -45,11 +47,12 @@ class CRUDBooking:
             return None
         return await db.run_sync(lambda sess: self.get_booking_by_id(sess, bid))
 
-    async def get_async(self, db: AsyncSession, booking_id: int) -> Optional[Booking]:
+    async def get_async(self, db: AsyncSession, booking_id: UUID) -> Optional[Booking]:
         """שליפה אסינכרונית להזמנה עם טעינת יחסים (לשימוש ב-API endpoints)."""
         from app.domain.rides.model import Ride
         from app.domain.passengers.model import PassengerRequest
 
+        bid = UUID(str(booking_id)) if isinstance(booking_id, str) else booking_id
         stmt = (
             select(Booking)
             .options(
@@ -57,7 +60,7 @@ class CRUDBooking:
                 joinedload(Booking.passenger_request).joinedload(PassengerRequest.user),
                 joinedload(Booking.passenger),
             )
-            .where(Booking.booking_id == booking_id)
+            .where(Booking.booking_id == bid)
         )
         result = await db.execute(stmt)
         return result.scalars().first()
@@ -66,8 +69,9 @@ class CRUDBooking:
         # הקוד שכתבנו קודם עם ה-select...
         pass
 
-    def get_bookings_by_ride(self, db: Session, ride_id: int) -> List[Booking]:
+    def get_bookings_by_ride(self, db: Session, ride_id: UUID) -> List[Booking]:
         """עדכון שליפת כל הבוקינגס של נסיעה (למשל לביטול נסיעה ע"י נהג)"""
+        rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
         return (
             db.query(Booking)
             .options(
@@ -75,36 +79,41 @@ class CRUDBooking:
                 joinedload(Booking.passenger_request).joinedload(PassengerRequest.user),
             )
             .filter(
-                Booking.ride_id == ride_id, Booking.status == BookingStatus.CONFIRMED
+                Booking.ride_id == rid, Booking.status == BookingStatus.CONFIRMED
             )
             .all()
         )
 
-    def get_ride_for_update(self, db: Session, ride_id: int) -> Optional[Ride]:
-        return db.query(Ride).filter(Ride.ride_id == ride_id).with_for_update().first()
+    def get_ride_for_update(self, db: Session, ride_id: UUID) -> Optional[Ride]:
+        rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
+        return db.query(Ride).filter(Ride.ride_id == rid).with_for_update().first()
 
     def get_existing_booking(
-        self, db: Session, ride_id: int, request_id: int
+        self, db: Session, ride_id: UUID, request_id: UUID
     ) -> Optional[Booking]:
+        rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
+        reqid = UUID(str(request_id)) if isinstance(request_id, str) else request_id
         return (
             db.query(Booking)
             .filter(
-                Booking.ride_id == ride_id,
-                Booking.request_id == request_id,
+                Booking.ride_id == rid,
+                Booking.request_id == reqid,
                 Booking.status != BookingStatus.CANCELLED,
             )
             .first()
         )
 
     def get_booking_by_ride_and_passenger(
-        self, db: Session, ride_id: int, passenger_id: int
+        self, db: Session, ride_id: UUID, passenger_id: UUID
     ) -> Optional[Booking]:
         """בודק אם כבר קיימת הזמנה (כל סטטוס) לאותה נסיעה ולאותו נוסע – למניעת כפילות (unique_passenger_per_ride)."""
+        rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
+        pid = UUID(str(passenger_id)) if isinstance(passenger_id, str) else passenger_id
         return (
             db.query(Booking)
             .filter(
-                Booking.ride_id == ride_id,
-                Booking.passenger_id == passenger_id,
+                Booking.ride_id == rid,
+                Booking.passenger_id == pid,
             )
             .first()
         )
@@ -112,9 +121,9 @@ class CRUDBooking:
     def reuse_booking_after_rejection_or_cancellation(
         self,
         db: Session,
-        ride_id: int,
-        passenger_id: int,
-        request_id: int,
+        ride_id: UUID,
+        passenger_id: UUID,
+        request_id: UUID,
         num_seats: int,
     ) -> Optional[Booking]:
         """מעדכן booking קיים (CANCELLED/REJECTED) לבקשה חדשה – מאפשר 'בקשת הצטרפות מחדש' בלי להפר את unique_passenger_per_ride."""
@@ -142,9 +151,9 @@ class CRUDBooking:
     def create_booking_entry(
         self,
         db: Session,
-        ride_id: int,
-        request_id: int,
-        passenger_id: int,
+        ride_id: UUID,
+        request_id: UUID,
+        passenger_id: UUID,
         num_seats: int,
     ) -> Booking:
         # טעינת PassengerRequest כדי להעתיק את פרטי תחנת העלייה
@@ -204,15 +213,16 @@ class CRUDBooking:
         if booking.request_id:
             self.update_passenger_request_status_from_bookings(db, booking.request_id)
 
-    def cancel_all_bookings_for_ride(self, db: Session, ride_id: int):
+    def cancel_all_bookings_for_ride(self, db: Session, ride_id: UUID):
         """
         ביטול רוחבי ומקצועי:
         1. מבטל את כל ההזמנות (Bookings) של הנסיעה.
         2. מחזיר את כל בקשות הנוסעים (PassengerRequests) לסטטוס PENDING.
         """
+        rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
         target_request_ids = (
             db.query(Booking.request_id)
-            .filter(Booking.ride_id == ride_id, Booking.request_id.isnot(None))
+            .filter(Booking.ride_id == rid, Booking.request_id.isnot(None))
             .all()
         )
 
@@ -226,11 +236,11 @@ class CRUDBooking:
                 synchronize_session="fetch",
             )
 
-        db.query(Booking).filter(Booking.ride_id == ride_id).update(
+        db.query(Booking).filter(Booking.ride_id == rid).update(
             {Booking.status: BookingStatus.CANCELLED.value}, synchronize_session="fetch"
         )
 
-        db.query(Ride).filter(Ride.ride_id == ride_id).update(
+        db.query(Ride).filter(Ride.ride_id == rid).update(
             {Ride.status: RideStatus.CANCELLED.value}, synchronize_session="fetch"
         )
 
@@ -239,7 +249,7 @@ class CRUDBooking:
     # --- פונקציות נוספות שנדרשות על ידי ה-BookingService ---
 
     def get_user_bookings_filtered(
-        self, db: Session, user_id: int, status_filter: Optional[str] = None
+        self, db: Session, user_id: UUID, status_filter: Optional[str] = None
     ) -> List[Booking]:
         """שליפת כל ההזמנות שמשתמש ביצע (כנוסע) – עם passenger_request.user ו-passenger כדי ש-passenger_name יופיע ב-API."""
         query = (
@@ -255,12 +265,13 @@ class CRUDBooking:
         return query.order_by(Booking.created_at.desc()).all()
 
     def get_user_bookings_with_relations(
-        self, db: Session, user_id: int
+        self, db: Session, user_id: UUID
     ) -> List[Booking]:
         """הזמנות של הנוסע עם נסיעה ונהג (למסך התראות)."""
+        uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
         return (
             db.query(Booking)
-            .filter(Booking.passenger_id == user_id)
+            .filter(Booking.passenger_id == uid)
             .options(
                 joinedload(Booking.ride).joinedload(Ride.driver),
                 joinedload(Booking.passenger_request).joinedload(PassengerRequest.user),
@@ -270,24 +281,26 @@ class CRUDBooking:
         )
 
     def get_ride_bookings_by_status(
-        self, db: Session, ride_id: int, booking_status: str
+        self, db: Session, ride_id: UUID, booking_status: str
     ) -> List[Booking]:
         """שליפת הזמנות עבור נסיעה ספציפית לפי סטטוס"""
+        rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
         return (
             db.query(Booking)
-            .filter(Booking.ride_id == ride_id, Booking.status == booking_status)
+            .filter(Booking.ride_id == rid, Booking.status == booking_status)
             .all()
         )
 
     def get_all_pending_bookings_for_driver(
-        self, db: Session, driver_id: int
+        self, db: Session, driver_id: UUID
     ) -> List[Booking]:
         """כל הבקשות הממתינות לאישור עבור נסיעות של הנהג (למסך התראות)."""
+        did = UUID(str(driver_id)) if isinstance(driver_id, str) else driver_id
         return (
             db.query(Booking)
             .join(Ride)
             .filter(
-                Ride.driver_id == driver_id,
+                Ride.driver_id == did,
                 Booking.status == BookingStatus.PENDING,
             )
             .options(
@@ -298,30 +311,32 @@ class CRUDBooking:
             .all()
         )
 
-    def get_request_ids_for_ride(self, db: Session, ride_id: int) -> list[int]:
+    def get_request_ids_for_ride(self, db: Session, ride_id: UUID) -> list:
+        rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
         results = (
             db.query(Booking.request_id)
-            .filter(Booking.ride_id == ride_id, Booking.request_id.isnot(None))
+            .filter(Booking.ride_id == rid, Booking.request_id.isnot(None))
             .all()
         )
         return [r[0] for r in results]
 
     def bulk_update_bookings_status(
-        self, db: Session, ride_id: int, new_status: BookingStatus
+        self, db: Session, ride_id: UUID, new_status: BookingStatus
     ):
         # Send enum value as plain string so PostgreSQL gets 'cancelled' not 'CANCELLED'
         status_val = (
             new_status.value if hasattr(new_status, "value") else str(new_status)
         )
+        rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
         db.execute(
             text(
                 "UPDATE bookings SET status = CAST(:status AS booking_status), updated_at = now() WHERE ride_id = :ride_id"
             ),
-            {"status": status_val, "ride_id": ride_id},
+            {"status": status_val, "ride_id": rid},
         )
 
     def bulk_update_requests_status(
-        self, db: Session, request_ids: list[int], new_status: PassengerStatus
+        self, db: Session, request_ids: list, new_status: PassengerStatus
     ):
         status_value = (
             new_status.value if hasattr(new_status, "value") else str(new_status)
@@ -331,18 +346,13 @@ class CRUDBooking:
         ).update({PassengerRequest.status: status_value}, synchronize_session="fetch")
 
     def determine_passenger_request_status(
-        self, db: Session, request_id: int
+        self, db: Session, request_id: UUID
     ) -> PassengerStatus:
         """
         קובע את הסטטוס המתאים של PassengerRequest לפי מצב ה-bookings שלו.
-        לוגיקה:
-        - APPROVED: יש לפחות booking אחד עם CONFIRMED
-        - PENDING: יש לפחות booking אחד עם PENDING, אין CONFIRMED
-        - REJECTED: כל ה-bookings REJECTED, אין CONFIRMED
-        - COMPLETED: כל ה-bookings COMPLETED
-        - ACTIVE: אין bookings או כולם CANCELLED/REJECTED ללא CONFIRMED
         """
-        bookings = db.query(Booking).filter(Booking.request_id == request_id).all()
+        reqid = UUID(str(request_id)) if isinstance(request_id, str) else request_id
+        bookings = db.query(Booking).filter(Booking.request_id == reqid).all()
 
         if not bookings:
             return PassengerStatus.ACTIVE
@@ -370,21 +380,22 @@ class CRUDBooking:
         return PassengerStatus.ACTIVE
 
     def update_passenger_request_status_from_bookings(
-        self, db: Session, request_id: int
+        self, db: Session, request_id: UUID
     ) -> None:
         """מעדכן את סטטוס ה-PassengerRequest לפי מצב ה-bookings שלו."""
         if not request_id:
             return
-        new_status = self.determine_passenger_request_status(db, request_id)
+        reqid = UUID(str(request_id)) if isinstance(request_id, str) else request_id
+        new_status = self.determine_passenger_request_status(db, reqid)
         # צריך להעביר את ה-value של ה-enum, לא את האובייקט עצמו
         status_value = (
             new_status.value if hasattr(new_status, "value") else str(new_status)
         )
         db.query(PassengerRequest).filter(
-            PassengerRequest.request_id == request_id
+            PassengerRequest.request_id == reqid
         ).update({PassengerRequest.status: status_value}, synchronize_session="fetch")
 
-    def complete_bookings_by_ride_ids(self, db: Session, ride_ids: list[int]):
+    def complete_bookings_by_ride_ids(self, db: Session, ride_ids: list):
         """מעדכן סטטוס לכל הבוקינגס ששייכים לרשימת נסיעות"""
         return (
             db.query(Booking)
@@ -400,8 +411,9 @@ class CRUDBooking:
 
     # סוף הקובץ app/domain/bookings/crud.py
 
-    def get_user_history(self, db: Session, user_id: int, role: str) -> List[Booking]:
+    def get_user_history(self, db: Session, user_id: UUID, role: str) -> List[Booking]:
         # שימוש ב-joinedload כדי למנוע את בעיית ה-N+1 (שליפה יעילה)
+        uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
         query = (
             db.query(Booking)
             .options(joinedload(Booking.ride))
@@ -410,12 +422,12 @@ class CRUDBooking:
 
         if role == "driver":
             # תיקון: אנחנו צריכים את הנהג של הנסיעה
-            query = query.join(Ride).filter(Ride.ride_id == user_id)
+            query = query.join(Ride).filter(Ride.driver_id == uid)
         elif role == "passenger":
-            query = query.filter(Booking.passenger_id == user_id)
+            query = query.filter(Booking.passenger_id == uid)
         else:
             query = query.join(Ride).filter(
-                or_(Ride.ride_id == user_id, Booking.passenger_id == user_id)
+                or_(Ride.driver_id == uid, Booking.passenger_id == uid)
             )
 
         return query.order_by(Booking.created_at.desc()).all()

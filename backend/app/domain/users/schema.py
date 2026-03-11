@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
 from typing import Optional
+from uuid import UUID
 
 from app.core.utils.validators import (
     normalize_email_for_auth,
@@ -54,7 +55,7 @@ class UserBaseSchema(BaseModel):
 
 # --- קריאה (Response) ---
 class UserRead(BaseModel):
-    user_id: int
+    user_id: UUID
     full_name: str
     phone_number: str
     email: Optional[EmailStr] = None

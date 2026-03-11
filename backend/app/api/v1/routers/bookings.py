@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
+from uuid import UUID
 
 from app.db.session import get_db
 from app.api.dependencies.auth import get_current_user
@@ -41,14 +42,14 @@ async def request_to_join(
 
 @router.patch("/{booking_id}/approve", response_model=BookingResponse)
 async def approve_booking(
-    booking_id: int, driver_id: int, db: AsyncSession = Depends(get_db)
+    booking_id: UUID, driver_id: UUID, db: AsyncSession = Depends(get_db)
 ):
     return await BookingService.approve_booking(db, booking_id, driver_id)
 
 
 @router.patch("/{booking_id}/reject", response_model=BookingResponse)
 async def reject_booking(
-    booking_id: int, driver_id: int, db: AsyncSession = Depends(get_db)
+    booking_id: UUID, driver_id: UUID, db: AsyncSession = Depends(get_db)
 ):
     try:
         return await BookingService.reject_booking(
@@ -60,7 +61,7 @@ async def reject_booking(
 
 @router.post("/{booking_id}/cancel", response_model=BookingResponse)
 async def cancel_booking(
-    booking_id: int,
+    booking_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -69,7 +70,7 @@ async def cancel_booking(
 
 @router.get("/my-bookings", response_model=List[BookingResponse])
 async def get_user_bookings(
-    user_id: int,
+    user_id: UUID,
     status: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
 ):
@@ -78,20 +79,20 @@ async def get_user_bookings(
 
 @router.get("/ride/{ride_id}/manifest", response_model=RideManifestResponse)
 async def get_ride_manifest(
-    ride_id: int, driver_id: int, db: AsyncSession = Depends(get_db)
+    ride_id: UUID, driver_id: UUID, db: AsyncSession = Depends(get_db)
 ):
     return await BookingService.get_ride_manifest(db, ride_id, driver_id)
 
 
 @router.get("/ride/{ride_id}/pending", response_model=List[BookingResponse])
 async def get_pending_requests(
-    ride_id: int, driver_id: int, db: AsyncSession = Depends(get_db)
+    ride_id: UUID, driver_id: UUID, db: AsyncSession = Depends(get_db)
 ):
     return await BookingService.get_pending_requests(db, ride_id, driver_id)
 
 
 @router.get("/{booking_id}", response_model=BookingResponse)
-async def get_booking(booking_id: int, db: AsyncSession = Depends(get_db)):
+async def get_booking(booking_id: UUID, db: AsyncSession = Depends(get_db)):
     return await BookingService.get_booking(db, booking_id)
 
 

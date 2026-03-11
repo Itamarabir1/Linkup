@@ -1,15 +1,12 @@
 """
 שירות אחסון S3 – אווטאר: staging (ע"י API או presigned URL) ו-finalize (ע"י worker).
 מבנה: avatars/staging/{user_id}_{uuid}.ext → avatars/{base_name}-{user_id}.ext (base_name = slug משם המשתמש).
-
-העלאה יכולה להתבצע בשתי דרכים:
-1. דרך API: streaming ישירות מ-UploadFile ל-S3 (בלי tempfile).
-2. Presigned URL: הלקוח מעלה ישירות ל-S3, השרת רק מחזיר URL.
 """
 
 import uuid
 import logging
-from typing import Optional
+from typing import Optional, Union
+from uuid import UUID
 
 from fastapi import UploadFile
 
@@ -36,13 +33,13 @@ class StorageService:
     def _ext_from_key(self, key: str) -> str:
         return key.split(".")[-1] if "." in key else "jpg"
 
-    async def upload_avatar_to_staging(self, file: UploadFile, user_id: int) -> str:
+    async def upload_avatar_to_staging(self, file: UploadFile, user_id: Union[UUID, int, str]) -> str:
         """
-        מעלה קובץ ל-S3 staging באמצעות streaming ישירות מ-UploadFile (בלי tempfile).
-        מחזיר staging_key לשימוש ב-outbox ו-worker.
+        מעלה קובץ ל-S3 staging. מחזיר staging_key לשימוש ב-outbox ו-worker.
         """
+        uid_str = str(user_id)
         ext = _normalize_avatar_ext(file.filename)
-        staging_key = f"{STAGING_PREFIX}{user_id}_{uuid.uuid4().hex}.{ext}"
+        staging_key = f"{STAGING_PREFIX}{uid_str}_{uuid.uuid4().hex}.{ext}"
 
         # Streaming ישירות מ-UploadFile ל-S3 - בלי tempfile ובלי לקרוא הכל לזיכרון
         await self.client.upload_fileobj(
@@ -54,15 +51,15 @@ class StorageService:
         return staging_key
 
     async def generate_avatar_upload_url(
-        self, user_id: int, filename: Optional[str] = None, expiration: int = 300
+        self, user_id: Union[UUID, int, str], filename: Optional[str] = None, expiration: int = 300
     ) -> tuple[str, str]:
         """
         יוצר presigned URL להעלאה ישירה ל-S3 staging.
         מחזיר: (presigned_url, staging_key)
-        expiration: זמן תוקף בשניות (ברירת מחדל: 5 דקות).
         """
+        uid_str = str(user_id)
         ext = _normalize_avatar_ext(filename)
-        staging_key = f"{STAGING_PREFIX}{user_id}_{uuid.uuid4().hex}.{ext}"
+        staging_key = f"{STAGING_PREFIX}{uid_str}_{uuid.uuid4().hex}.{ext}"
         content_type = f"image/{ext}"
 
         presigned_url = await self.client.generate_presigned_upload_url(
@@ -75,19 +72,20 @@ class StorageService:
         return presigned_url, staging_key
 
     async def finalize_avatar(
-        self, staging_key: str, user_id: int, base_name: Optional[str] = None
+        self, staging_key: str, user_id: Union[UUID, int, str], base_name: Optional[str] = None
     ) -> str:
         """
         מעביר מ-staging ל-final, מוחק staging, מחזיר URL סופי.
         base_name = slug משם המשתמש (full_name) – שם הקובץ יהיה {base_name}-{user_id}.ext.
         """
+        uid_str = str(user_id)
         if not staging_key.startswith(STAGING_PREFIX):
             raise ValueError(f"Invalid staging key: {staging_key}")
         ext = self._ext_from_key(staging_key)
         if base_name:
-            final_key = f"{FINAL_PREFIX}{base_name}-{user_id}.{ext}"
+            final_key = f"{FINAL_PREFIX}{base_name}-{uid_str}.{ext}"
         else:
-            final_key = f"{FINAL_PREFIX}{user_id}.{ext}"
+            final_key = f"{FINAL_PREFIX}{uid_str}.{ext}"
 
         # מחיקת קובץ קיים אם יש (למקרה של החלפה)
         try:
@@ -102,14 +100,15 @@ class StorageService:
         logger.info("Avatar finalized: %s -> %s", staging_key, final_key)
         return final_url
 
-    async def upload_user_avatar(self, file: UploadFile, user_id: int) -> str:
+    async def upload_user_avatar(self, file: UploadFile, user_id: Union[UUID, int, str]) -> str:
         """העלאה סינכרונית ישירה (לשימוש לא-תור). מבנה: users/{user_id}/avatars/{uuid}.ext"""
+        uid_str = str(user_id)
         ext = (
             (file.filename or "").split(".")[-1]
             if "." in (file.filename or "")
             else "jpg"
         )
-        key = f"users/{user_id}/avatars/{uuid.uuid4()}.{ext}"
+        key = f"users/{uid_str}/avatars/{uuid.uuid4()}.{ext}"
         return await self.client.upload_fileobj(
             file_data=file.file,
             key=key,
@@ -147,25 +146,26 @@ class StorageService:
         await self.client.delete_object(key)
         logger.info("Avatar deleted from S3: key=%s", key)
 
-    async def delete_avatar_by_user_id(self, user_id: int) -> None:
+    async def delete_avatar_by_user_id(self, user_id: Union[UUID, int, str]) -> None:
         """
-        מוחק מ-S3 את תמונת הפרופיל של המשתמש (בפועל תמונה אחת ל-user).
-        מחפש: avatars/{user_id}.*, avatars/*-{user_id}.* (שם-משתמש), users/{user_id}/avatars/
+        מוחק מ-S3 את תמונת הפרופיל של המשתמש.
+        מחפש: avatars/{user_id}.*, avatars/*-{user_id}.*, users/{user_id}/avatars/
         """
+        uid_str = str(user_id)
         prefixes = [
-            f"{FINAL_PREFIX}{user_id}",  # avatars/25.jpg
-            f"users/{user_id}/avatars/",
+            f"{FINAL_PREFIX}{uid_str}",  # avatars/<uuid>.jpg
+            f"users/{uid_str}/avatars/",
         ]
         for prefix in prefixes:
             keys = await self.client.list_objects_by_prefix(prefix)
             for key in keys:
-                await self._delete_avatar_key(key, user_id)
+                await self._delete_avatar_key(key, uid_str)
         keys_all_avatars = await self.client.list_objects_by_prefix(FINAL_PREFIX)
         for key in keys_all_avatars:
-            if f"-{user_id}." in key:
-                await self._delete_avatar_key(key, user_id)
+            if f"-{uid_str}." in key:
+                await self._delete_avatar_key(key, uid_str)
 
-    async def _delete_avatar_key(self, key: str, user_id: int) -> None:
+    async def _delete_avatar_key(self, key: str, user_id_label: str) -> None:
         try:
             await self.client.delete_object(key)
             logger.info("S3 deleted avatar by user_id: key=%s", key)

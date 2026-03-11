@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import Dict, Any, List, Optional
+from uuid import UUID
 from app.domain.events.enum import DispatchTarget
 
 
@@ -27,16 +28,30 @@ class Event(BaseModel):
     # --- חילוץ נתונים חכם (Properties) ---
 
     @property
-    def user_id(self) -> Optional[int]:
+    def user_id(self) -> Optional[UUID]:
         """חילוץ בטוח של user_id מה-payload"""
         val = self.payload.get("user_id")
-        return int(val) if val is not None and str(val).isdigit() else None
+        if val is None:
+            return None
+        if isinstance(val, UUID):
+            return val
+        try:
+            return UUID(str(val))
+        except (ValueError, TypeError):
+            return None
 
     @property
-    def ride_id(self) -> Optional[int]:
+    def ride_id(self) -> Optional[UUID]:
         """חילוץ בטוח של ride_id מה-payload"""
         val = self.payload.get("ride_id")
-        return int(val) if val is not None and str(val).isdigit() else None
+        if val is None:
+            return None
+        if isinstance(val, UUID):
+            return val
+        try:
+            return UUID(str(val))
+        except (ValueError, TypeError):
+            return None
 
     @property
     def routing_key(self) -> str:

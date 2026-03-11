@@ -4,6 +4,7 @@
 
 import logging
 from typing import Optional
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,8 +15,8 @@ logger = logging.getLogger(__name__)
 
 async def get_conversation_text_for_analysis(
     db: AsyncSession,
-    conversation_id: int,
-    current_user_id: int,
+    conversation_id: UUID,
+    current_user_id: UUID,
     limit: int = 50,
 ) -> Optional[str]:
     """

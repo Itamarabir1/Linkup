@@ -6,6 +6,7 @@
 import asyncio
 import json
 import logging
+from uuid import UUID
 import redis.asyncio as redis
 
 from app.core.config import settings
@@ -29,11 +30,11 @@ async def _process_completion_message(payload_str: str) -> None:
                 data,
             )
             return
+        cid = UUID(str(conversation_id))
+        uid = UUID(str(trigger_user_id))
         async with SessionLocal() as db:
             try:
-                await handle_conversation_completion(
-                    db, int(conversation_id), int(trigger_user_id)
-                )
+                await handle_conversation_completion(db, cid, uid)
                 await db.commit()
             except Exception:
                 await db.rollback()

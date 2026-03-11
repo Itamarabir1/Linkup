@@ -1,6 +1,7 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import UUID
 from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.domain.users.crud import crud_user
@@ -38,7 +39,7 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
         )
 
-    user = await crud_user.get_by_id(db, id=int(user_id))
+    user = await crud_user.get_by_id(db, id=UUID(str(user_id)))
 
     if not user or not user.is_active:
         logger.warning(f"❌ User {user_id} not found or inactive")
@@ -61,7 +62,7 @@ async def get_current_user_optional(
     user_id = payload.get("sub")
     if not user_id:
         return None
-    user = await crud_user.get_by_id(db, id=int(user_id))
+    user = await crud_user.get_by_id(db, id=UUID(str(user_id)))
     if not user or not user.is_active:
         return None
     return user

@@ -3,9 +3,11 @@
 Conversation = זוג משתמשים (מזוהה יחיד). Message = הודעה בשיחה.
 """
 
+import uuid
 from sqlalchemy import (
     Column,
     Integer,
+    BigInteger,
     ForeignKey,
     DateTime,
     Text,
@@ -15,6 +17,7 @@ from sqlalchemy import (
     JSON,
 )
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
 from app.db.base import Base
 
@@ -27,12 +30,12 @@ class Conversation(Base):
 
     __tablename__ = "conversations"
 
-    conversation_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    conversation_id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id_1 = Column(
-        Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
+        PG_UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
     )
     user_id_2 = Column(
-        Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
+        PG_UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
     )
     created_at = Column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
@@ -61,14 +64,14 @@ class Message(Base):
 
     __tablename__ = "messages"
 
-    message_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    message_id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
     conversation_id = Column(
-        Integer,
+        PG_UUID(as_uuid=True),
         ForeignKey("conversations.conversation_id", ondelete="CASCADE"),
         nullable=False,
     )
     sender_id = Column(
-        Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
+        PG_UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
     )
     body = Column(Text, nullable=False)
     created_at = Column(
@@ -87,9 +90,9 @@ class ChatAnalysis(Base):
 
     __tablename__ = "chat_analysis"
 
-    analysis_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    analysis_id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
     conversation_id = Column(
-        Integer,
+        PG_UUID(as_uuid=True),
         ForeignKey("conversations.conversation_id", ondelete="CASCADE"),
         nullable=False,
         unique=True,

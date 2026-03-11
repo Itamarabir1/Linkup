@@ -3,6 +3,7 @@
 כל ה-endpoints דורשים אימות (get_current_user).
 """
 
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -73,7 +74,7 @@ async def create_or_get_conversation(
     summary="פתיחת שיחה דרך booking",
 )
 async def create_or_get_conversation_by_booking(
-    booking_id: int,
+    booking_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -130,7 +131,7 @@ async def list_conversations(
     summary="פרטי שיחה",
 )
 async def get_conversation(
-    conversation_id: int,
+    conversation_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -153,7 +154,7 @@ async def get_conversation(
     summary="שליחת הודעה",
 )
 async def post_message(
-    conversation_id: int,
+    conversation_id: UUID,
     data: MessageCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -179,7 +180,7 @@ async def post_message(
     summary="היסטוריית הודעות",
 )
 async def list_conversation_messages(
-    conversation_id: int,
+    conversation_id: UUID,
     limit: int = Query(50, ge=1, le=100),
     before_message_id: int | None = Query(None, description="לפני הודעה (pagination)"),
     db: AsyncSession = Depends(get_db),
@@ -207,7 +208,7 @@ async def list_conversation_messages(
     response_class=Response,
 )
 async def export_conversation_calendar(
-    conversation_id: int,
+    conversation_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

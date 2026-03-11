@@ -1,6 +1,7 @@
 import logging
 from urllib.parse import quote
 from typing import Any
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Domain Imports
@@ -71,7 +72,8 @@ class NotificationHandler:
                 NotificationEvent.RIDE_CREATED_FOR_PASSENGERS,
                 NotificationEvent.RIDE_CANCELLED_BY_DRIVER,
             ):
-                resolved = await crud_user.get(db, id=payload["passenger_id"])
+                pid = payload["passenger_id"]
+                resolved = await crud_user.get(db, id=UUID(str(pid)) if not isinstance(pid, UUID) else pid)
             else:
                 resolved = recipient_resolver.resolve(event_key, source_data)
             logger.info(
@@ -173,8 +175,10 @@ class NotificationHandler:
                 and "user_id_2" in resolved
             ):
                 # שליחה לשני משתמשים
-                user1 = await crud_user.get(db, id=resolved["user_id_1"])
-                user2 = await crud_user.get(db, id=resolved["user_id_2"])
+                uid1 = resolved["user_id_1"]
+                uid2 = resolved["user_id_2"]
+                user1 = await crud_user.get(db, id=UUID(str(uid1)) if not isinstance(uid1, UUID) else uid1)
+                user2 = await crud_user.get(db, id=UUID(str(uid2)) if not isinstance(uid2, UUID) else uid2)
 
                 if user1:
                     command1 = NotificationCommand(
@@ -276,7 +280,7 @@ class NotificationHandler:
 
         if booking_id is not None:
             try:
-                bid = int(booking_id)
+                bid = UUID(str(booking_id))
             except (TypeError, ValueError):
                 bid = None
             if bid is not None:
@@ -288,11 +292,14 @@ class NotificationHandler:
                     )
                 return booking
         if ride_id:
-            return await crud_ride.get_for_notification(db, ride_id)
+            rid = UUID(str(ride_id)) if not isinstance(ride_id, UUID) else ride_id
+            return await crud_ride.get_for_notification(db, rid)
         if passenger_id:
-            return await crud_passenger.get(db, id=passenger_id)
+            pid = UUID(str(passenger_id)) if not isinstance(passenger_id, UUID) else passenger_id
+            return await crud_passenger.get(db, id=pid)
         if user_id:
-            return await crud_user.get(db, id=user_id)
+            uid = UUID(str(user_id)) if not isinstance(user_id, UUID) else user_id
+            return await crud_user.get(db, id=uid)
 
         return payload
 

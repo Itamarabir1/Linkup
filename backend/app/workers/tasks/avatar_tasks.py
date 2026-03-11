@@ -5,6 +5,7 @@
 
 import logging
 from typing import Dict, Any
+from uuid import UUID
 
 from app.core.utils.validators import slugify_for_avatar
 from app.db.session import SessionLocal
@@ -47,7 +48,7 @@ async def _handle_avatar_upload(data: Dict[str, Any]) -> None:
         )
         raise ValueError("user_id and staging_key required")
 
-    user_id = int(user_id)
+    user_id = UUID(str(user_id))
 
     async with SessionLocal() as db:
         try:
@@ -104,7 +105,7 @@ async def _handle_avatar_remove(data: Dict[str, Any]) -> None:
         logger.error("Invalid avatar_remove payload: user_id=%s", user_id)
         raise ValueError("user_id required")
 
-    user_id = int(user_id)
+    user_id = UUID(str(user_id))
 
     async with SessionLocal() as db:
         try:

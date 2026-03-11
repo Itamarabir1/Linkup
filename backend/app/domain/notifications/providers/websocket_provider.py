@@ -23,7 +23,7 @@ class WebSocketProvider(BaseNotificationProvider):
     async def send(
         self, user: Any, config: Dict[str, Any], context: Dict[str, Any]
     ) -> None:
-        user_id = getattr(user, "id", None)
+        user_id = getattr(user, "user_id", None) or getattr(user, "id", None)
         if not user_id:
             logger.error("❌ [WS Provider] User object has no ID")
             return

@@ -10,8 +10,9 @@ from sqlalchemy import (
     String,
 )
 from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM, UUID as PG_UUID
 from geoalchemy2 import Geography
+import uuid
 from app.db.base import Base
 from app.domain.bookings.enum import BookingStatus
 from sqlalchemy import Index
@@ -45,22 +46,22 @@ class Booking(Base):
 
     __tablename__ = "bookings"
 
-    booking_id = Column(Integer, primary_key=True, index=True)
+    booking_id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # 1. הקשר לנסיעה
     ride_id = Column(
-        Integer, ForeignKey("rides.ride_id", ondelete="CASCADE"), nullable=False
+        PG_UUID(as_uuid=True), ForeignKey("rides.ride_id", ondelete="CASCADE"), nullable=False
     )
 
     # 2. הקשר הישיר לנוסע (התיקון הקריטי!)
     # ב-SQL שלך העמודה הזו קיימת, עכשיו היא קיימת גם כאן
     passenger_id = Column(
-        Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
+        PG_UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
     )
 
     # 3. הקשר לבקשה המקורית (אופציונלי - ON DELETE SET NULL)
     request_id = Column(
-        Integer,
+        PG_UUID(as_uuid=True),
         ForeignKey("passenger_requests.request_id", ondelete="SET NULL"),
         nullable=True,
     )

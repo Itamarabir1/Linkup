@@ -1,5 +1,6 @@
 import random
 import logging
+from uuid import UUID
 from sqlalchemy.orm import Session
 from typing import Dict, Any
 
@@ -282,13 +283,19 @@ class AuthService:
         # 2. בדיקה אם משתמש קיים
         user = await self.crud_user.get_by_email(db, email=email)
 
+        if user:
+            logger.info(
+                "[Google] user from DB: user_id=%s type=%s",
+                user.user_id,
+                type(user.user_id).__name__,
+            )
+
         if not user:
             # 3. Auto-signup: יצירת משתמש חדש
-            # מספר טלפון זמני - המשתמש יוכל לעדכן מאוחר יותר
-            # נשתמש בפורמט תקין של מספר טלפון (E.164) עם prefix זמני
-            # נשתמש ב-sub מ-Google כדי ליצור מספר ייחודי
-            google_sub = google_user.get("sub", "000000000")[:9]  # 9 ספרות ראשונות
-            placeholder_phone = f"+972500000{google_sub}"  # פורמט E.164 תקין
+            # מספר טלפון זמני – 10 ספרות כמו מספר רגיל (05X-XXXXXXX), ב-E.164: +9725 + 8 ספרות
+            google_sub = "".join(c for c in (google_user.get("sub") or "00000000") if c.isdigit())[:8]
+            google_sub = google_sub.ljust(8, "0")  # בדיוק 8 ספרות
+            placeholder_phone = f"+9725{google_sub}"  # +972 5X XXXXXXX = 12 ספרות, תקני E.164
 
             # יצירת סיסמה דמה (לא בשימוש, אבל נדרש ב-DB)
             # נשתמש ב-random string ארוך שלא ניתן לנחש
@@ -332,6 +339,20 @@ class AuthService:
             )
             await db.commit()
 
+        else:
+            # משתמש קיים – קישור Google ID אם עדיין לא מקושר
+            google_sub = google_user.get("sub")
+            if google_sub and not getattr(user, "google_id", None):
+                logger.info(
+                    "[Google] linking google_id for user_id=%s type=%s",
+                    user.user_id,
+                    type(user.user_id).__name__,
+                )
+                user.google_id = google_sub
+                user.is_verified = True
+                await db.commit()
+                await db.refresh(user)
+
         # 4. יצירת tokens (גם למשתמש חדש וגם למשתמש קיים)
         access_token = create_access_token(data={"sub": str(user.user_id)})
         refresh_token = create_refresh_token(data={"sub": str(user.user_id)})
@@ -374,7 +395,7 @@ class AuthService:
         if not user_id:
             raise InvalidRefreshTokenError()
 
-        user = await self.crud_user.get_by_id(db, id=int(user_id))
+        user = await self.crud_user.get_by_id(db, id=UUID(str(user_id)))
         if not user or not user.is_active:
             raise InvalidRefreshTokenError()
         if user.refresh_token != refresh_token:
@@ -402,7 +423,7 @@ class AuthService:
         await self.crud_user.update_refresh_token(db, user=user, refresh_token=None)
 
     async def change_password(
-        self, db: AsyncSession, user_id: int, data: ChangePasswordRequest
+        self, db: AsyncSession, user_id: UUID, data: ChangePasswordRequest
     ) -> dict:
         """
         שינוי סיסמה למשתמש מחובר: אימות סיסמה ישנה, עדכון לסיסמה חדשה.

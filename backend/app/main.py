@@ -10,9 +10,13 @@ from app.core.config import settings
 from app.core.lifespan import lifespan
 from app.core.exceptions.handlers import LinkupError, linkup_exception_handler
 from app.core.middleware import HTTPSRedirectMiddleware, SecurityHeadersMiddleware
-from app.admin.setup import setup_admin
 from app.db.session import engine
 from app.api.v1.api_router import api_router
+
+# רישום כל המודלים לפני טעינת admin (מניעת "expression 'Group' failed to locate a name")
+import app.db.models  # noqa: F401
+
+from app.admin.setup import setup_admin
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

@@ -3,6 +3,9 @@ import logging
 import signal
 import sys
 
+# רישום כל המודלים לפני שימוש ב-ORM (מניעת "expression 'Group' failed to locate a name")
+import app.db.models  # noqa: F401
+
 # Infrastructure
 from app.infrastructure.rabbitmq.client import rabbit_client
 from app.infrastructure.rabbitmq.consumer import RabbitMQConsumer

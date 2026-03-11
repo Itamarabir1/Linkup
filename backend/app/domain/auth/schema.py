@@ -1,4 +1,5 @@
 from typing import Optional
+from uuid import UUID
 from pydantic import (
     BaseModel,
     EmailStr,
@@ -145,7 +146,7 @@ class ChangePasswordRequest(BaseModel):
 
 
 class UserOut(BaseModel):
-    user_id: int
+    user_id: UUID
     full_name: str
     email: EmailStr
     phone_number: str
@@ -164,7 +165,7 @@ class Token(BaseModel):
 class LoginUserInfo(BaseModel):
     """מינימום לפרונט – להצגת 'ברוך הבא, {full_name}'."""
 
-    user_id: int
+    user_id: UUID
     full_name: str
     email: EmailStr
 

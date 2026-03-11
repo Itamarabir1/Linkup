@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
 from typing import List, Optional, Dict, Any
+from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
@@ -45,27 +46,30 @@ class CRUDRide:
         db.refresh(db_obj)
         return db_obj
 
-    def get(self, db: Session, ride_id: int) -> Optional[Ride]:
+    def get(self, db: Session, ride_id: UUID) -> Optional[Ride]:
         """שליפה מהירה לפי מפתח ראשי (Session סינכרוני)."""
-        return db.query(Ride).filter(Ride.ride_id == ride_id).first()
+        rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
+        return db.query(Ride).filter(Ride.ride_id == rid).first()
 
-    async def get_async(self, db: AsyncSession, ride_id: int) -> Optional[Ride]:
+    async def get_async(self, db: AsyncSession, ride_id: UUID) -> Optional[Ride]:
         """שליפה לפי מפתח ראשי ל-AsyncSession (לשימוש ב-read_ride ו-API אסינכרוני)."""
-        stmt = select(Ride).where(Ride.ride_id == ride_id)
+        rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
+        stmt = select(Ride).where(Ride.ride_id == rid)
         result = await db.execute(stmt)
         return result.scalars().first()
 
-    def get_with_driver(self, db: Session, ride_id: int) -> Optional[Ride]:
+    def get_with_driver(self, db: Session, ride_id: UUID) -> Optional[Ride]:
         """שליפת נסיעה עם טעינת הנהג (לפרטי נהג לתצוגה לנוסע)."""
+        rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
         return (
             db.query(Ride)
             .options(joinedload(Ride.driver))
-            .filter(Ride.ride_id == ride_id)
+            .filter(Ride.ride_id == rid)
             .first()
         )
 
     def get_for_update(
-        self, db: Session, ride_id: int, driver_id: Optional[int] = None
+        self, db: Session, ride_id: UUID, driver_id: Optional[UUID] = None
     ) -> Optional[Ride]:
         """
         Senior Implementation: שליפת נסיעה עם נעילת שורה (FOR UPDATE).
@@ -74,12 +78,12 @@ class CRUDRide:
         - with_for_update(): נועל את השורה עד לסיום הטרנזקציה (Commit/Rollback),
           מה שמונע מ-Race Conditions לקרות (למשל: נהג ונוסע שמבטלים בו-זמנית).
         """
-        # 1. התחלת השאילתה בסינון לפי ה-Primary Key
-        query = db.query(Ride).filter(Ride.ride_id == ride_id)
+        rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
+        query = db.query(Ride).filter(Ride.ride_id == rid)
 
-        # 2. אימות בעלות ברמת ה-SQL (אם נשלח ID של נהג)
         if driver_id is not None:
-            query = query.filter(Ride.driver_id == driver_id)
+            did = UUID(str(driver_id)) if isinstance(driver_id, str) else driver_id
+            query = query.filter(Ride.driver_id == did)
 
         # 3. ביצוע הנעילה והשליפה
         # חשוב: המתודה מחזירה None אם השורה לא נמצאה (או לא שייכת לנהג)
@@ -95,11 +99,12 @@ class CRUDRide:
     async def get_by_driver_id(
         self,
         db: AsyncSession,
-        driver_id: int,
+        driver_id: UUID,
         status: Optional[RideStatus] = None,
     ) -> List[Ride]:
         """שליפת נסיעות לפי נהג (למסך 'הנסיעות שלי')."""
-        stmt = select(Ride).where(Ride.driver_id == driver_id)
+        did = UUID(str(driver_id)) if isinstance(driver_id, str) else driver_id
+        stmt = select(Ride).where(Ride.driver_id == did)
         if status is not None:
             stmt = stmt.where(Ride.status == status)
         stmt = stmt.order_by(Ride.departure_time.desc())
@@ -107,7 +112,7 @@ class CRUDRide:
         return list(result.scalars().all())
 
     def update_status(
-        self, db: Session, ride_id: int, status: RideStatus
+        self, db: Session, ride_id: UUID, status: RideStatus
     ) -> Optional[Ride]:
         """עדכון סטטוס מאובטח (SELECT FOR UPDATE)"""
         ride = self.get_for_update(db, ride_id)
@@ -117,7 +122,7 @@ class CRUDRide:
         return ride
 
     def update_seats(
-        self, db: Session, ride_id: int, num_seats_change: int
+        self, db: Session, ride_id: UUID, num_seats_change: int
     ) -> Optional[Ride]:
         """עדכון מושבים אטומי עם בדיקת תקינות"""
         ride = self.get_for_update(db, ride_id)
@@ -132,7 +137,7 @@ class CRUDRide:
     ALLOWED_UPDATE_FIELDS = ("available_seats", "departure_time")
 
     def update_partial(
-        self, db: Session, ride_id: int, driver_id: int, **updates: Any
+        self, db: Session, ride_id: UUID, driver_id: UUID, **updates: Any
     ) -> Optional[Ride]:
         """עדכון חלקי – רק available_seats ו-departure_time. בודק בעלות וולידציית מושבים."""
         ride = self.get_for_update(db, ride_id, driver_id)
@@ -161,14 +166,14 @@ class CRUDRide:
         db.refresh(ride)
         return ride
 
-    def get_expired_ids(self, db: Session, now: datetime) -> list[int]:
+    def get_expired_ids(self, db: Session, now: datetime) -> list:
         """רק מביא את ה-IDs של מה שצריך לסגור"""
         query = db.query(Ride.ride_id).filter(
             Ride.departure_time < now, Ride.status == RideStatus.OPEN
         )
         return [r.ride_id for r in query.all()]
 
-    def bulk_set_completed(self, db: Session, ride_ids: list[int]):
+    def bulk_set_completed(self, db: Session, ride_ids: list):
         """מעדכן סטטוס גורף לנסיעות ספציפיות"""
         if not ride_ids:
             return 0
@@ -238,13 +243,14 @@ class CRUDRide:
         return result.scalars().all()
 
     async def get_for_notification(
-        self, db: AsyncSession, ride_id: int
+        self, db: AsyncSession, ride_id: UUID
     ) -> Optional[Ride]:
         """שליפת נסיעה עם נהג (לבניית קונטקסט במייל/פוש)."""
+        rid = UUID(str(ride_id)) if isinstance(ride_id, str) else ride_id
         stmt = (
             select(Ride)
             .options(selectinload(Ride.driver))
-            .where(Ride.ride_id == ride_id)
+            .where(Ride.ride_id == rid)
         )
         result = await db.execute(stmt)
         return result.scalars().first()

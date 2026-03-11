@@ -4,6 +4,7 @@
 """
 
 import logging
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -24,19 +25,17 @@ logger = logging.getLogger(__name__)
 
 
 async def can_chat_about_booking(
-    db: AsyncSession, booking_id: int, current_user_id: int
+    db: AsyncSession, booking_id: UUID, current_user_id: UUID
 ) -> tuple[bool, Booking | None]:
     """
     בודק אם המשתמש הנוכחי יכול לדבר על booking זה.
     מחזיר (is_allowed, booking) - רק אם המשתמש הוא הנהג או הנוסע של ה-booking
     והסטטוס הוא pending_approval או confirmed.
     """
+    bid = UUID(str(booking_id)) if isinstance(booking_id, str) else booking_id
     result = await db.execute(
         select(Booking)
-        .options(
-            # Load ride and driver for access
-        )
-        .where(Booking.booking_id == booking_id)
+        .where(Booking.booking_id == bid)
     )
     booking = result.scalars().first()
     if not booking:
@@ -64,7 +63,7 @@ async def can_chat_about_booking(
 
 
 async def get_or_create_conversation(
-    db: AsyncSession, current_user_id: int, other_user_id: int
+    db: AsyncSession, current_user_id: UUID, other_user_id: UUID
 ) -> ConversationDetail:
     """
     מחזיר או יוצר שיחה בין current_user ל־other_user.
@@ -91,7 +90,7 @@ async def get_or_create_conversation(
 
 
 async def get_or_create_conversation_by_booking(
-    db: AsyncSession, booking_id: int, current_user_id: int
+    db: AsyncSession, booking_id: UUID, current_user_id: UUID
 ) -> ConversationDetail:
     """
     מחזיר או יוצר שיחה בין נהג לנוסע על בסיס booking_id.
@@ -138,11 +137,11 @@ async def get_or_create_conversation_by_booking(
         conversation_id=conv.conversation_id,
         partner=partner,
         created_at=conv.created_at,
-        booking_id=booking_id,  # Link back to booking
+        booking_id=booking.booking_id,
     )
 
 
-def _partner_from_conversation(conv, current_user_id: int) -> ConversationPartner:
+def _partner_from_conversation(conv, current_user_id: UUID) -> ConversationPartner:
     """מחזיר את הצד השני בשיחה (User → ConversationPartner)."""
     user = conv.user_2 if conv.user_id_1 == current_user_id else conv.user_1
     return ConversationPartner(
@@ -153,7 +152,7 @@ def _partner_from_conversation(conv, current_user_id: int) -> ConversationPartne
 
 
 async def list_my_conversations(
-    db: AsyncSession, current_user_id: int
+    db: AsyncSession, current_user_id: UUID
 ) -> list[ConversationListItem]:
     """
     רשימת שיחות של המשתמש עם פרטי הצד השני והודעה אחרונה.
@@ -182,7 +181,7 @@ async def list_my_conversations(
 
 
 async def get_conversation_detail(
-    db: AsyncSession, conversation_id: int, current_user_id: int
+    db: AsyncSession, conversation_id: UUID, current_user_id: UUID
 ) -> ConversationDetail | None:
     """
     פרטי שיחה אחת – רק אם המשתמש participant.
@@ -200,8 +199,8 @@ async def get_conversation_detail(
 
 async def send_message(
     db: AsyncSession,
-    conversation_id: int,
-    sender_id: int,
+    conversation_id: UUID,
+    sender_id: UUID,
     body: str,
 ) -> MessageResponse | None:
     """
@@ -223,9 +222,9 @@ async def send_message(
     recipient_id = conv.user_id_2 if conv.user_id_1 == sender_id else conv.user_id_1
     payload = {
         "message_id": msg.message_id,
-        "conversation_id": msg.conversation_id,
-        "sender_id": msg.sender_id,
-        "recipient_id": recipient_id,
+        "conversation_id": str(msg.conversation_id),
+        "sender_id": str(msg.sender_id),
+        "recipient_id": str(recipient_id),
         "body": msg.body,
         "created_at": msg.created_at.isoformat() if msg.created_at else None,
     }
@@ -249,13 +248,14 @@ async def send_message(
 
 async def get_messages(
     db: AsyncSession,
-    conversation_id: int,
-    current_user_id: int,
+    conversation_id: UUID,
+    current_user_id: UUID,
     limit: int = 50,
     before_message_id: int | None = None,
 ) -> list[MessageResponse] | None:
     """
     היסטוריית הודעות בשיחה (pagination). None אם המשתמש לא participant.
+    before_message_id remains int (BigInt in DB).
     """
     conv = await chat_crud.get_conversation_by_id(db, conversation_id, current_user_id)
     if not conv:

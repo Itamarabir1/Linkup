@@ -1,6 +1,7 @@
 import json
 import logging
 from typing import Dict, Any
+from uuid import UUID
 
 from app.infrastructure.redis.broadcast import broadcast
 from app.domain.rides.enum import RideStatus, RideBroadcastAction
@@ -54,7 +55,7 @@ class RideNotificationFactory:
         )
         return {
             "event": config["event_prefix"],
-            "ride_id": ride.ride_id,
+            "ride_id": str(ride.ride_id),
             "status": ride.status.value
             if hasattr(ride.status, "value")
             else str(ride.status),
@@ -63,7 +64,7 @@ class RideNotificationFactory:
         }
 
 
-async def publish_ride_update(ride_id: int, message_data: dict) -> None:
+async def publish_ride_update(ride_id: UUID, message_data: dict) -> None:
     """פרסום עדכונים לערוץ ה-Realtime של הנסיעה (WebSocket)."""
     channel_name = f"ride_{ride_id}"
     payload = (

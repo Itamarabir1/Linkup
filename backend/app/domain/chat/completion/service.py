@@ -3,6 +3,7 @@ Service לזיהוי סיום שיחה, ניתוח AI, ושמירת תוצאות
 """
 
 import logging
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.chat import crud as chat_crud
@@ -16,8 +17,8 @@ logger = logging.getLogger(__name__)
 
 async def handle_conversation_completion(
     db: AsyncSession,
-    conversation_id: int,
-    current_user_id: int,
+    conversation_id: UUID,
+    current_user_id: UUID,
 ) -> bool:
     """
     מטפל בסיום שיחה: בודק אם כבר נותח, מנתח, שומר, ושולח event.
@@ -77,9 +78,9 @@ async def handle_conversation_completion(
             db=db,
             event_name="chat.conversation.completed",
             payload={
-                "conversation_id": conversation_id,
-                "user_id_1": conv.user_id_1,
-                "user_id_2": conv.user_id_2,
+                "conversation_id": str(conversation_id),
+                "user_id_1": str(conv.user_id_1),
+                "user_id_2": str(conv.user_id_2),
                 "driver_name": ride_summary.driver_name,
                 "passenger_name": ride_summary.passenger_name,
                 "pickup_location": ride_summary.pickup_location,

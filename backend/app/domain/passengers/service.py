@@ -1,5 +1,6 @@
 import logging
 from typing import List, Optional
+from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy.ext.asyncio import AsyncSession
 from geoalchemy2.shape import to_shape
@@ -27,7 +28,7 @@ logger = logging.getLogger(__name__)
 class PassengerService:
     @staticmethod
     def create_passenger_request(
-        db: Session, request_in: PassengerRequestCreate, passenger_id: int
+        db: Session, request_in: PassengerRequestCreate, passenger_id: UUID
     ):
         """יוצר בקשה (מודעה) ומחפש נהגים תואמים מיד. passenger_id מהטוקן (API)."""
         try:
@@ -61,12 +62,12 @@ class PassengerService:
 
     @staticmethod
     def toggle_request_notifications(
-        db: Session, request_id: int, update_data: PassengerRequestUpdateNotifications
+        db: Session, request_id: UUID, update_data: PassengerRequestUpdateNotifications
     ):
         """עדכון כפתור ההתראות (הסוכן החכם) לבקשה ספציפית"""
         p_req = crud_passenger.get_by_id(db, request_id)
         if not p_req:
-            raise PassengerRequestNotFoundError(request_id=request_id)
+            raise PassengerRequestNotFoundError(request_id=str(request_id))
 
         p_req.is_notification_active = update_data.is_notification_active
         db.commit()
@@ -77,11 +78,11 @@ class PassengerService:
         return p_req
 
     @staticmethod
-    def cancel_request(db: Session, request_id: int, passenger_id: int):
+    def cancel_request(db: Session, request_id: UUID, passenger_id: UUID):
         """ביטול הבקשה ושחרור כל ההזמנות הקשורות אליה (רק לבעל הבקשה)."""
         p_req = crud_passenger.get_by_id(db, request_id)
         if not p_req:
-            raise PassengerRequestNotFoundError(request_id=request_id)
+            raise PassengerRequestNotFoundError(request_id=str(request_id))
 
         # הרשאות: רק בעל הבקשה יכול לבטל
         if p_req.passenger_id != passenger_id:
@@ -101,7 +102,7 @@ class PassengerService:
     @staticmethod
     async def get_my_requests(
         db: AsyncSession,
-        passenger_id: int,
+        passenger_id: UUID,
         status: Optional[str] = None,
     ) -> List[PassengerRequestResponse]:
         """רשימת הבקשות שלי כנוסע (הבקשות שלי)."""
@@ -112,11 +113,11 @@ class PassengerService:
         return [PassengerRequestResponse.model_validate(r) for r in requests]
 
     @staticmethod
-    def get_matches_by_request_id(db: Session, request_id: int):
+    def get_matches_by_request_id(db: Session, request_id: UUID):
         """שליפת התאמות חדשות לבקשה קיימת"""
         p_req = crud_passenger.get_by_id(db, request_id)
         if not p_req:
-            raise PassengerRequestNotFoundError(request_id=request_id)
+            raise PassengerRequestNotFoundError(request_id=str(request_id))
 
         try:
             origin_point = to_shape(p_req.pickup_geom)
@@ -206,7 +207,7 @@ class PassengerService:
         return crud_passenger.get_multi_rides(db, status=status)
 
     @staticmethod
-    def get_ride_driver_info(db: Session, ride_id: int) -> DriverInfoResponse:
+    def get_ride_driver_info(db: Session, ride_id: UUID) -> DriverInfoResponse:
         """פרטי נהג של נסיעה – רק לנסיעות פתוחות (OPEN/FULL). מחזיר 404 אם לא נמצא או לא רלוונטי."""
         ride = crud_ride.get_with_driver(db, ride_id)
         if not ride:
@@ -224,7 +225,7 @@ class PassengerService:
     @staticmethod
     def create_passenger_request_for_ride_search(
         db: Session,
-        passenger_id: int,
+        passenger_id: UUID,
         pickup_name: str,
         destination_name: str,
         num_seats: int = 1,

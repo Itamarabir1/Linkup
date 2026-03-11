@@ -3,6 +3,7 @@ CRUD צ'אט 1:1 – שיחות והודעות.
 תמיד שומרים user_id_1 < user_id_2 ב־Conversation.
 """
 
+from uuid import UUID
 from sqlalchemy import select, desc, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -14,13 +15,15 @@ from app.domain.chat.model import Conversation, Message, ChatAnalysis
 
 
 async def get_or_create_conversation(
-    db: AsyncSession, user_id_a: int, user_id_b: int
+    db: AsyncSession, user_id_a: UUID, user_id_b: UUID
 ) -> Conversation:
     """
     מחזיר שיחה קיימת בין שני המשתמשים, או יוצר חדשה.
     user_id_1 < user_id_2 תמיד.
     """
-    u1, u2 = min(user_id_a, user_id_b), max(user_id_a, user_id_b)
+    u1_raw, u2_raw = (user_id_a, user_id_b) if user_id_a < user_id_b else (user_id_b, user_id_a)
+    u1 = UUID(str(u1_raw)) if isinstance(u1_raw, str) else u1_raw
+    u2 = UUID(str(u2_raw)) if isinstance(u2_raw, str) else u2_raw
     if u1 == u2:
         raise ValueError("Cannot create conversation with self")
 
@@ -42,11 +45,13 @@ async def get_or_create_conversation(
 
 
 async def get_conversation_by_id(
-    db: AsyncSession, conversation_id: int, participant_user_id: int
+    db: AsyncSession, conversation_id: UUID, participant_user_id: UUID
 ) -> Conversation | None:
     """
     מחזיר שיחה לפי ID רק אם המשתמש הוא participant (user_id_1 או user_id_2).
     """
+    cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
+    pid = UUID(str(participant_user_id)) if isinstance(participant_user_id, str) else participant_user_id
     result = await db.execute(
         select(Conversation)
         .options(
@@ -54,10 +59,10 @@ async def get_conversation_by_id(
             selectinload(Conversation.user_2),
         )
         .where(
-            Conversation.conversation_id == conversation_id,
+            Conversation.conversation_id == cid,
             or_(
-                Conversation.user_id_1 == participant_user_id,
-                Conversation.user_id_2 == participant_user_id,
+                Conversation.user_id_1 == pid,
+                Conversation.user_id_2 == pid,
             ),
         )
     )
@@ -65,11 +70,12 @@ async def get_conversation_by_id(
 
 
 async def list_conversations_for_user(
-    db: AsyncSession, user_id: int
+    db: AsyncSession, user_id: UUID
 ) -> list[Conversation]:
     """
     רשימת כל השיחות של המשתמש (כשותף).
     """
+    uid = UUID(str(user_id)) if isinstance(user_id, str) else user_id
     result = await db.execute(
         select(Conversation)
         .options(
@@ -78,8 +84,8 @@ async def list_conversations_for_user(
         )
         .where(
             or_(
-                Conversation.user_id_1 == user_id,
-                Conversation.user_id_2 == user_id,
+                Conversation.user_id_1 == uid,
+                Conversation.user_id_2 == uid,
             )
         )
         .order_by(desc(Conversation.created_at))
@@ -137,14 +143,16 @@ async def get_conversations_with_timeout(
 
 async def create_message(
     db: AsyncSession,
-    conversation_id: int,
-    sender_id: int,
+    conversation_id: UUID,
+    sender_id: UUID,
     body: str,
 ) -> Message:
     """שומר הודעה חדשה בשיחה."""
+    cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
+    sid = UUID(str(sender_id)) if isinstance(sender_id, str) else sender_id
     msg = Message(
-        conversation_id=conversation_id,
-        sender_id=sender_id,
+        conversation_id=cid,
+        sender_id=sid,
         body=body,
     )
     db.add(msg)
@@ -155,17 +163,18 @@ async def create_message(
 
 async def get_messages(
     db: AsyncSession,
-    conversation_id: int,
+    conversation_id: UUID,
     limit: int = 50,
     before_message_id: int | None = None,
 ) -> list[Message]:
     """
     היסטוריית הודעות בשיחה (pagination).
-    before_message_id = אופציונלי, לשליפה "לפני" הודעה מסוימת.
+    before_message_id = אופציונלי, לשליפה "לפני" הודעה מסוימת (int – BigInt ב-DB).
     """
+    cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
     q = (
         select(Message)
-        .where(Message.conversation_id == conversation_id)
+        .where(Message.conversation_id == cid)
         .order_by(desc(Message.created_at))
         .limit(limit + 1)
     )
@@ -177,11 +186,12 @@ async def get_messages(
     return messages[::-1]  # ישן → חדש
 
 
-async def get_last_message(db: AsyncSession, conversation_id: int) -> Message | None:
+async def get_last_message(db: AsyncSession, conversation_id: UUID) -> Message | None:
     """הודעה אחרונה בשיחה (להרשימה)."""
+    cid = UUID(str(conversation_id)) if isinstance(conversation_id, str) else conversation_id
     result = await db.execute(
         select(Message)
-        .where(Message.conversation_id == conversation_id)
+        .where(Message.conversation_id == cid)
         .order_by(desc(Message.created_at))
         .limit(1)
     )

@@ -1,4 +1,5 @@
 from typing import Optional, Any, Dict, Union
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
@@ -15,14 +16,15 @@ class CRUDUser:
     מימוש אסינכרוני מלא (SQLAlchemy 2.0) התואם לשיטת DDD.
     """
 
-    async def get_by_id(self, db: AsyncSession, id: int) -> Optional[User]:
-        """שליפת משתמש לפי ID"""
-        result = await db.execute(select(User).filter(User.user_id == id))
+    async def get_by_id(self, db: AsyncSession, id: Union[UUID, str]) -> Optional[User]:
+        """שליפת משתמש לפי ID (UUID)"""
+        uid = UUID(str(id)) if isinstance(id, str) else id
+        result = await db.execute(select(User).filter(User.user_id == uid))
         return result.scalars().first()
 
-    async def get(self, db: AsyncSession, *, id: Union[int, str]) -> Optional[User]:
-        """שליפת משתמש לפי ID – חתימה get(db, id=...) לשימוש ב־NotificationHandler. id יכול להיות int או str."""
-        return await self.get_by_id(db, int(id) if id is not None else 0)
+    async def get(self, db: AsyncSession, *, id: Union[UUID, str]) -> Optional[User]:
+        """שליפת משתמש לפי ID – חתימה get(db, id=...) לשימוש ב־NotificationHandler. id יכול להיות UUID או str."""
+        return await self.get_by_id(db, id)
 
     async def get_by_email(self, db: AsyncSession, email: str) -> Optional[User]:
         """שליפת משתמש לפי אימייל (case-insensitive)"""
@@ -86,7 +88,7 @@ class CRUDUser:
         return db_obj
 
     async def update_location(
-        self, db: AsyncSession, *, user_id: int, lat: float, lon: float
+        self, db: AsyncSession, *, user_id: Union[UUID, str], lat: float, lon: float
     ) -> bool:
         """עדכון מיקום גיאוגרפי (GIS)"""
         point_wkt = f"POINT({lon} {lat})"  # סטנדרט PostGIS: Longitude קודם

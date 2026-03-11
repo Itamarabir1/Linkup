@@ -6,6 +6,7 @@
 import json
 import logging
 from typing import Any
+from uuid import UUID
 
 from app.infrastructure.redis.pubsub import redis_pubsub
 
@@ -14,11 +15,11 @@ logger = logging.getLogger(__name__)
 CHAT_CHANNEL_PREFIX = "chat:conversation:"
 
 
-def _channel(conversation_id: int) -> str:
+def _channel(conversation_id: UUID) -> str:
     return f"{CHAT_CHANNEL_PREFIX}{conversation_id}"
 
 
-async def publish_chat_message(conversation_id: int, payload: dict[str, Any]) -> int:
+async def publish_chat_message(conversation_id: UUID, payload: dict[str, Any]) -> int:
     """
     מפרסם הודעת צ'אט לערוץ Redis. שרת ה-WS (Go) מאזין ל־chat:conversation:* ומעביר ל-WebSocket.
     payload: למשל { "message_id", "conversation_id", "sender_id", "body", "created_at" } (כ־ISO string).

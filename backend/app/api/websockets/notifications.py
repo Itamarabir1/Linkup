@@ -18,15 +18,15 @@ async def websocket_endpoint(
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
+    user_id = getattr(user, "user_id", None) or getattr(user, "id", None)
     await websocket.accept()
-    logger.info(f"🔌 WebSocket connection accepted for user: {user.id}")
+    logger.info(f"🔌 WebSocket connection accepted for user: {user_id}")
 
     try:
-        # הקריאה הנכונה דרך ה-Instance של ה-Service
-        await notification_service.stream_user_notifications(websocket, user.id)
+        await notification_service.stream_user_notifications(websocket, user_id)
 
     except WebSocketDisconnect:
-        logger.info(f"👋 User {user.id} disconnected")
+        logger.info(f"👋 User {user_id} disconnected")
     except Exception as e:
-        logger.error(f"❌ Unexpected error in WebSocket for user {user.id}: {e}")
+        logger.error(f"❌ Unexpected error in WebSocket for user {user_id}: {e}")
         # כאן אפשר להשתמש ב-LinkupError אם תרצה לעטוף שגיאות תשתית

@@ -5,12 +5,13 @@
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 
 class ConversationCreate(BaseModel):
     """פתיחת שיחה עם משתמש – מזהה או יוצר שיחה 1:1."""
 
-    other_user_id: int = Field(..., gt=0, description="מזהה המשתמש השני")
+    other_user_id: UUID = Field(..., description="מזהה המשתמש השני")
 
 
 class MessageCreate(BaseModel):
@@ -26,8 +27,8 @@ class MessageResponse(BaseModel):
     """הודעה אחת בתשובה."""
 
     message_id: int
-    conversation_id: int
-    sender_id: int
+    conversation_id: UUID
+    sender_id: UUID
     body: str
     created_at: datetime
 
@@ -37,7 +38,7 @@ class MessageResponse(BaseModel):
 class ConversationPartner(BaseModel):
     """מידע מינימלי על הצד השני בשיחה (להרשימה)."""
 
-    user_id: int
+    user_id: UUID
     full_name: str
     avatar_url: Optional[str] = None
 
@@ -47,7 +48,7 @@ class ConversationPartner(BaseModel):
 class ConversationListItem(BaseModel):
     """שיחה אחת ברשימת השיחות שלי (עם פרטי הצד השני והודעה אחרונה אופציונלית)."""
 
-    conversation_id: int
+    conversation_id: UUID
     partner: ConversationPartner
     last_message_at: Optional[datetime] = None
     last_message_preview: Optional[str] = None
@@ -58,9 +59,9 @@ class ConversationListItem(BaseModel):
 class ConversationDetail(BaseModel):
     """שיחה מלאה – לפתיחה/צפייה (מזהה + פרטי הצד השני)."""
 
-    conversation_id: int
+    conversation_id: UUID
     partner: ConversationPartner
     created_at: datetime
-    booking_id: Optional[int] = None  # קישור ל-booking אם השיחה נוצרה דרך booking
+    booking_id: Optional[UUID] = None  # קישור ל-booking אם השיחה נוצרה דרך booking
 
     model_config = ConfigDict(from_attributes=True)

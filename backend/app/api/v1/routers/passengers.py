@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime
 from typing import List, Optional
-
+from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
@@ -83,7 +83,7 @@ def create_new_request(
     summary="עדכון סטטוס התראות לסוכן החכם",
 )
 def update_notification_status(
-    request_id: int,
+    request_id: UUID,
     update_data: PassengerRequestUpdateNotifications,
     db: Session = Depends(get_db),
 ):
@@ -98,7 +98,7 @@ def update_notification_status(
     summary="פרטי נהג לנסיעה (רק כשלחיצה על 'הצג פרטי הנהג')",
 )
 async def get_ride_driver_info(
-    ride_id: int,
+    ride_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -204,7 +204,7 @@ async def search_available_rides(
 # 4. ביטול בקשה
 @router.delete("/{request_id}/cancel", summary="ביטול בקשת נסיעה ושחרור שריונים")
 async def cancel_request(
-    request_id: int,
+    request_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -227,7 +227,7 @@ async def cancel_request(
     response_model=List[RideResponse],
     summary="שליפת התאמות עדכניות לבקשה קיימת",
 )
-def get_latest_matches(request_id: int, db: Session = Depends(get_db)):
+def get_latest_matches(request_id: UUID, db: Session = Depends(get_db)):
     return PassengerService.get_matches_by_request_id(db, request_id)
 
 

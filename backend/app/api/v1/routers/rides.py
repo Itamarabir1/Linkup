@@ -1,5 +1,6 @@
 import logging
 from typing import List, Optional
+from uuid import UUID
 from fastapi import (
     APIRouter,
     Depends,
@@ -66,7 +67,7 @@ async def get_my_rides(
 
 @router.patch("/{ride_id}", response_model=RideResponse)
 async def update_ride(
-    ride_id: int,
+    ride_id: UUID,
     payload: RideUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -84,7 +85,7 @@ async def update_ride(
 
 @router.delete("/{ride_id}/cancel", status_code=status.HTTP_204_NO_CONTENT)
 async def cancel_ride(
-    ride_id: int,
+    ride_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -96,7 +97,7 @@ async def cancel_ride(
 
 
 @router.get("/{ride_id}", response_model=RideResponse)
-async def read_ride(ride_id: int, db: AsyncSession = Depends(get_db)):
+async def read_ride(ride_id: UUID, db: AsyncSession = Depends(get_db)):
     ride = await ride_service.get_ride_by_id(db, ride_id)
     if not ride:
         raise HTTPException(status_code=404, detail="נסיעה לא נמצאה")
@@ -107,7 +108,7 @@ async def read_ride(ride_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.websocket("/ws/{ride_id}")
-async def ride_status_websocket(websocket: WebSocket, ride_id: int):
+async def ride_status_websocket(websocket: WebSocket, ride_id: UUID):
     """
     כאן קורה הקסם: הדפדפן מתחבר לכתובת הזו ונשאר בהאזנה.
     """

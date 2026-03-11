@@ -1,5 +1,6 @@
 import logging
 from typing import Dict, Any
+from uuid import UUID
 from app.db.session import SessionLocal
 from app.domain.notifications.core.handler import notification_handler
 from app.domain.notifications.services.reminder_scheduler import reminder_scheduler
@@ -19,10 +20,11 @@ async def handle_ride_created(db, data: Dict[str, Any]) -> None:
     """
     אירוע ride.created: טוען נסיעה, מוצא נוסעים רלוונטיים, שולח לכל אחד מייל (ride.created_for_passengers).
     """
-    ride_id = data.get("ride_id")
-    if not ride_id:
+    ride_id_raw = data.get("ride_id")
+    if not ride_id_raw:
         logger.warning("ride.created without ride_id in payload")
         return
+    ride_id = UUID(str(ride_id_raw))
 
     def _find_passengers(sess):
         ride = crud_ride.get(sess, ride_id)
@@ -54,7 +56,7 @@ async def handle_ride_created(db, data: Dict[str, Any]) -> None:
             await notification_handler.handle_event(
                 db,
                 event_name=NotificationEvent.RIDE_CREATED_FOR_PASSENGERS.value,
-                payload={"ride_id": ride_id, "passenger_id": pr.passenger_id},
+                payload={"ride_id": str(ride_id), "passenger_id": str(pr.passenger_id)},
             )
         except Exception as e:
             logger.warning(
@@ -73,14 +75,14 @@ async def handle_ride_cancelled_by_driver(db, data: Dict[str, Any]) -> None:
     """
     אירוע ride.cancelled_by_driver: טוען הזמנות של הנסיעה, שולח לכל נוסע מייל+פוש (ride.cancelled_by_driver).
     """
-    ride_id = data.get("ride_id")
-    if not ride_id:
+    ride_id_raw = data.get("ride_id")
+    if not ride_id_raw:
         logger.warning("ride.cancelled_by_driver without ride_id in payload")
         return
+    ride_id = UUID(str(ride_id_raw))
 
     def _find_bookings(sess):
         # מחפש את כל ה-bookings של הנסיעה (כולל CANCELLED, CONFIRMED, PENDING)
-        # כדי לשלוח התראה לכל הנוסעים שהיו מחוברים לנסיעה
         return sess.query(Booking).filter(Booking.ride_id == ride_id).all()
 
     bookings = await db.run_sync(_find_bookings)
@@ -109,7 +111,7 @@ async def handle_ride_cancelled_by_driver(db, data: Dict[str, Any]) -> None:
             await notification_handler.handle_event(
                 db,
                 event_name=NotificationEvent.RIDE_CANCELLED_BY_DRIVER.value,
-                payload={"ride_id": ride_id, "passenger_id": b.passenger_id},
+                payload={"ride_id": str(ride_id), "passenger_id": str(b.passenger_id)},
             )
         except Exception as e:
             logger.warning(
