@@ -52,6 +52,7 @@ class RideMapper:
             # 3. בניית המודל (יצירת אובייקט Ride) – כולל זמן נסיעה וק"מ של המסלול הנבחר
             return Ride(
                 driver_id=cached_data["driver_id"],
+                group_id=cached_data.get("group_id"),
                 departure_time=departure_time,
                 estimated_arrival_time=estimated_arrival,
                 # המרות גיאוגרפיות (PostGIS)

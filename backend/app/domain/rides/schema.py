@@ -50,6 +50,7 @@ class RidePreviewCreate(BaseModel):
 class RideCreate(BaseModel):
     session_id: str
     selected_route_index: int = 0
+    group_id: Optional[UUID] = None
 
 
 class RideUpdate(BaseModel):

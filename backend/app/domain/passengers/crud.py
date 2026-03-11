@@ -5,6 +5,7 @@ CRUD לבקשות נוסעים – מקור אמת יחיד, API עקבי.
 import logging
 from datetime import datetime, timedelta
 from typing import List, Optional
+from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, cast, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,23 +30,25 @@ class CRUDPassenger:
 
     # --- שליפה ---
 
-    def get_by_id(self, db: Session, request_id: int) -> Optional[PassengerRequest]:
+    def get_by_id(self, db: Session, request_id: UUID) -> Optional[PassengerRequest]:
         """שליפת בקשה לפי request_id (Session סינכרוני)."""
-        return db.get(PassengerRequest, request_id)
+        rid = UUID(str(request_id)) if isinstance(request_id, str) else request_id
+        return db.get(PassengerRequest, rid)
 
-    async def get(self, db: AsyncSession, *, id: int) -> Optional[PassengerRequest]:
+    async def get(self, db: AsyncSession, *, id: UUID) -> Optional[PassengerRequest]:
         """שליפת בקשה לפי request_id (AsyncSession – לשימוש ב־handler). חתימה: get(db, id=...)."""
         return await db.get(PassengerRequest, id)
 
     async def get_by_passenger_id(
         self,
         db: AsyncSession,
-        passenger_id: int,
+        passenger_id: UUID,
         status: Optional[PassengerStatus] = None,
     ) -> List[PassengerRequest]:
         """שליפת בקשות לפי נוסע (למסך 'הבקשות שלי')."""
+        pid = UUID(str(passenger_id)) if isinstance(passenger_id, str) else passenger_id
         stmt = select(PassengerRequest).where(
-            PassengerRequest.passenger_id == passenger_id
+            PassengerRequest.passenger_id == pid
         )
         if status is not None:
             stmt = stmt.where(PassengerRequest.status == status)
@@ -63,7 +66,7 @@ class CRUDPassenger:
         p_lon: float,
         d_lat: float,
         d_lon: float,
-        passenger_id: int,
+        passenger_id: UUID,
     ) -> PassengerRequest:
         """יצירת בקשה חדשה. passenger_id מהשרת (טוקן), לא מהגוף."""
         from datetime import timezone
@@ -77,6 +80,7 @@ class CRUDPassenger:
         db_request = PassengerRequest(
             passenger_id=passenger_id,
             num_passengers=request.num_passengers,
+            group_id=request.group_id if hasattr(request, "group_id") else None,
             pickup_name=request.pickup_name,
             destination_name=request.destination_name,
             requested_departure_time=req_time,

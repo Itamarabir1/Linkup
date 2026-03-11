@@ -1,6 +1,7 @@
 import json
 import logging
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -80,11 +81,13 @@ class RideService:
     # --- Create ride ---
 
     async def create_ride(
-        self, db: AsyncSession, ride_in: RideCreate, current_user_id: int
+        self, db: AsyncSession, ride_in: RideCreate, current_user_id: UUID
     ) -> RideResponse:
         """שלב 2: אישור סופי של הנסיעה והעברתה מה-Cache ל-PostgreSQL."""
         cached_data = await self._validate_and_get_cached_ride(ride_in)
         cached_data["driver_id"] = current_user_id
+        if ride_in.group_id:
+            cached_data["group_id"] = ride_in.group_id
         new_ride = RideMapper.map_cache_to_model(
             cached_data=cached_data,
             selected_index=ride_in.selected_route_index,
@@ -118,7 +121,7 @@ class RideService:
     async def _persist_ride_and_publish_event(db: AsyncSession, new_ride: Ride) -> None:
         db.add(new_ride)
         await db.flush()
-        await publish_to_outbox(db, "ride.created", {"ride_id": new_ride.ride_id})
+        await publish_to_outbox(db, "ride.created", {"ride_id": str(new_ride.ride_id)})
         await db.commit()
         await db.refresh(new_ride)
 
@@ -150,14 +153,14 @@ class RideService:
     # --- Read ---
 
     @staticmethod
-    async def get_ride_by_id(db: AsyncSession, ride_id: int):
+    async def get_ride_by_id(db: AsyncSession, ride_id: UUID):
         """שליפת נסיעה לפי מזהה (לשימוש ב-API עם AsyncSession)."""
         return await crud_ride.get_async(db, ride_id)
 
     async def get_my_rides(
         self,
         db: AsyncSession,
-        driver_id: int,
+        driver_id: UUID,
         status: Optional[str] = None,
     ) -> List[RideResponse]:
         """רשימת נסיעות של הנהג המחובר (הנסיעות שלי)."""
@@ -170,8 +173,8 @@ class RideService:
     async def update_ride(
         self,
         db: AsyncSession,
-        ride_id: int,
-        driver_id: int,
+        ride_id: UUID,
+        driver_id: UUID,
         payload: RideUpdate,
     ) -> RideResponse:
         """עדכון חלקי – זמן יציאה ו/או מספר מושבים. רק הנהג בעלים."""
@@ -199,7 +202,7 @@ class RideService:
             broadcast_payload = RideNotificationFactory.create_broadcast_payload(
                 ride, RideBroadcastAction.UPDATED.value
             )
-            broadcast_payload["ride_id"] = ride_id
+            broadcast_payload["ride_id"] = str(ride_id)
             await broadcast.publish(RIDES_LIST_CHANNEL, json.dumps(broadcast_payload))
         except Exception as e:
             logger.warning("Broadcast ride updated failed: %s", e)
@@ -208,7 +211,7 @@ class RideService:
     # --- Cancel ---
 
     async def cancel_ride_by_driver(
-        self, db: AsyncSession, ride_id: int, driver_id: int
+        self, db: AsyncSession, ride_id: UUID, driver_id: UUID
     ) -> None:
         """ביטול נסיעה על ידי הנהג. לוגיקה + Outbox ב-BookingService."""
         ride = await db.run_sync(
@@ -234,7 +237,7 @@ class RideService:
         try:
             payload = {
                 "event": "RIDE_CANCELLED",
-                "ride_id": ride_id,
+                "ride_id": str(ride_id),
                 "status": RideStatus.CANCELLED.value,
                 "color": "red",
                 "message": f"הנסיעה בוטלה על ידי הנהג (מ-{origin_name} ל-{destination_name})",
