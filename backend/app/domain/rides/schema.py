@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 from datetime import datetime
 from typing import List, Any, Dict, Optional
+from uuid import UUID
 from app.domain.rides.enum import RideStatus
 from app.core.utils.validators import validate_future_datetime
 from uuid import uuid4
@@ -28,7 +29,7 @@ class CoordinatesMixin(BaseModel):
 class RidePreviewCreate(BaseModel):
     """יצירת תצוגה מקדימה לנסיעה. מוצא: טקסט (origin_name) או מיקום נוכחי (origin_lat/origin_lon) – כמו אצל נוסע."""
 
-    driver_id: int
+    driver_id: UUID
     origin_name: Optional[str] = (
         None  # טקסט או ריק כשנשלחים origin_lat/origin_lon (מיקום נוכחי)
     )
@@ -38,6 +39,7 @@ class RidePreviewCreate(BaseModel):
     price: float = Field(default=0.0, ge=0.0)
     origin_lat: Optional[float] = Field(None, ge=-90, le=90)
     origin_lon: Optional[float] = Field(None, ge=-180, le=180)
+    group_id: Optional[UUID] = None
 
     @field_validator("departure_time")
     @classmethod
@@ -120,7 +122,7 @@ class RidePreviewResponse(LocationMixin):
 class RideBase(LocationMixin):
     """בסיס לנסיעה – בלי וולידציית 'זמן עתידי' (תשובות מה-DB כוללות נסיעות בעבר)."""
 
-    driver_id: int
+    driver_id: UUID
     departure_time: datetime
     estimated_arrival_time: datetime
     available_seats: int = Field(default=4, ge=1)
@@ -134,6 +136,7 @@ class RideCreateInternal(RideBase, CoordinatesMixin):
     total_distance_km: float
     total_duration_min: float
     status: RideStatus = RideStatus.OPEN
+    group_id: Optional[UUID] = None
 
     @field_validator("departure_time", "estimated_arrival_time")
     @classmethod
@@ -149,9 +152,10 @@ class RideCreateInternal(RideBase, CoordinatesMixin):
 class RideResponse(RideBase):
     """מחזיר נסיעה מלאה מה-DB"""
 
-    ride_id: int
+    ride_id: UUID
     status: RideStatus
     created_at: datetime
+    group_id: Optional[UUID] = None
     total_distance_km: float = Field(..., validation_alias="distance_km")
     total_duration_min: float = Field(..., validation_alias="duration_min")
     # שימוש ב-Alias כדי למשוך מה-Property של SQLAlchemy
@@ -164,7 +168,7 @@ class RideResponse(RideBase):
 class RideSearchResponse(BaseModel):
     """תצוגה מקוצרת לחיפוש"""
 
-    ride_id: int
+    ride_id: UUID
     origin_name: str
     destination_name: str
     departure_time: datetime

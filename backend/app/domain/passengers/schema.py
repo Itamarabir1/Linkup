@@ -4,6 +4,7 @@ from app.domain.passengers.enum import PassengerStatus
 from app.core.utils.validators import validate_future_datetime
 from fastapi import Query
 from typing import Optional, List
+from uuid import UUID
 from app.domain.rides.schema import RideResponse
 
 # --- 1. סכמות בסיס ליצירת בקשה ---
@@ -12,7 +13,7 @@ from app.domain.rides.schema import RideResponse
 class Passenger(BaseModel):
     """השרת ממלא passenger_id מהמשתמש המחובר – לא מהגוף."""
 
-    passenger_id: Optional[int] = Field(
+    passenger_id: Optional[UUID] = Field(
         None, description="ממולא בשרת מהטוקן; התעלם בקליינט"
     )
     num_passengers: int = Field(default=1, ge=1)
@@ -51,20 +52,22 @@ class PassengerRequestCreate(Passenger):
     is_auto_generated: bool = Field(
         default=False, description="האם נוצר מחיפוש אוטומטי"
     )
+    group_id: Optional[UUID] = None
 
 
 class PassengerRequestResponse(BaseModel):
     """נתוני הבקשה הבסיסיים כפי שנשמרו ב-DB"""
 
-    request_id: int
-    passenger_id: int
+    request_id: UUID
+    passenger_id: UUID
+    group_id: Optional[UUID] = None
     num_passengers: int
     pickup_name: str
     destination_name: str
     requested_departure_time: datetime
     status: PassengerStatus
     created_at: datetime
-    booking_id: Optional[int] = None
+    booking_id: Optional[UUID] = None
     # מחזירים את מצב הכפתור בתשובה מהשרת
     is_notification_active: bool
 
@@ -100,7 +103,7 @@ class PassengerRequestUpdateNotifications(BaseModel):
 class RideSearchRequest(BaseModel):
     """סכמת קלט לחיפוש; passenger_id ממולא בשרת אם יש auth (אופציונלי)."""
 
-    passenger_id: Optional[int] = Field(None, description="ממולא בשרת כשמשתמש מחובר")
+    passenger_id: Optional[UUID] = Field(None, description="ממולא בשרת כשמשתמש מחובר")
     pickup_name: str = Field(..., min_length=2)
     destination_name: str = Field(..., min_length=2)
     search_radius: int = Field(
@@ -116,7 +119,7 @@ class RideSearchResponse(BaseModel):
     """תשובת חיפוש נסיעות - כוללת נסיעות ו-request_id אם נוצרה בקשה."""
 
     rides: List[RideResponse] = Field(default=[], description="רשימת נסיעות שנמצאו")
-    request_id: Optional[int] = Field(
+    request_id: Optional[UUID] = Field(
         None, description="מזהה הבקשה שנוצרה (אם המשתמש מחובר)"
     )
 
@@ -124,8 +127,8 @@ class RideSearchResponse(BaseModel):
 class RequestRideFromSearch(BaseModel):
     """בקשת הצטרפות לנסיעה מתוך תוצאות חיפוש."""
 
-    ride_id: int
-    request_id: Optional[int] = Field(None, description="מזהה הבקשה מהחיפוש (אם קיים)")
+    ride_id: UUID
+    request_id: Optional[UUID] = Field(None, description="מזהה הבקשה מהחיפוש (אם קיים)")
     pickup_name: str = Field(..., min_length=1)
     destination_name: str = Field(..., min_length=1)
     num_seats: int = Field(default=1, ge=1)
