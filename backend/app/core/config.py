@@ -2,7 +2,7 @@ from pathlib import Path
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, EmailStr, computed_field
 from functools import lru_cache
-from typing import Optional, Dict, Any, List
+from typing import Optional, List
 
 # תיקיית backend (היכן ש-.env נמצא) – כך שה-.env נטען גם כשמריצים מ-cwd אחר
 _BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
@@ -18,13 +18,13 @@ class Settings(BaseSettings):
     # --- Project Metadata ---
     PROJECT_NAME: str = "LinkUp"
     APP_NAME: str = "linkup-backend"
-    DEBUG: bool = True
+    DEBUG: bool = Field(False)
     API_V1_STR: str = "/api/v1"
 
     # --- PostgreSQL / PostGIS ---
-    POSTGRES_USER: str = Field("admin")
-    POSTGRES_PASSWORD: str = Field("password123")
-    POSTGRES_DB: str = Field("linkup_app")
+    POSTGRES_USER: str = Field("")
+    POSTGRES_PASSWORD: str = Field("")
+    POSTGRES_DB: str = Field("")
     POSTGRES_HOST: str = Field("localhost")
     POSTGRES_PORT: str = Field("5432")
     # אופציונלי: חיבור מלא ל-Postgres משורת סביבה (למשל מ-Render)
@@ -91,8 +91,8 @@ class Settings(BaseSettings):
     # --- RabbitMQ (Infrastructure & Celery) ---
     RABBITMQ_HOST: str = Field("localhost")
     RABBITMQ_PORT: int = Field(5672)
-    RABBITMQ_USER: str = Field("guest")
-    RABBITMQ_PASSWORD: str = Field("guest")
+    RABBITMQ_USER: str = Field("")
+    RABBITMQ_PASSWORD: str = Field("")
     CELERY_TIMEZONE: str = Field("Asia/Jerusalem")
 
     @computed_field
@@ -105,25 +105,6 @@ class Settings(BaseSettings):
     @property
     def CELERY_BROKER_URL(self) -> str:
         return self.RABBITMQ_URL
-
-    # --- Kafka (KRaft Mode - No Zookeeper) ---
-    KAFKA_BOOTSTRAP_SERVERS: str = Field("localhost:9092")
-
-    # Topics
-    KAFKA_TOPIC_RIDES: str = Field("rides_stream")
-    KAFKA_TOPIC_NOTIFICATIONS: str = Field("user_notifications")
-    KAFKA_TOPIC_AUTH: str = Field("auth_events")
-    KAFKA_TOPIC_ANALYTICS: str = Field("system_analytics")
-
-    @computed_field
-    @property
-    def KAFKA_PRODUCER_CONFIG(self) -> Dict[str, Any]:
-        """קונפיגורציה מוכנה להזרקה ל-AIOKafkaProducer"""
-        return {
-            "bootstrap_servers": self.KAFKA_BOOTSTRAP_SERVERS,
-            "acks": "all",
-            "retry_backoff_ms": 100,
-        }
 
     # --- Frontend & API (לינקים במיילים / כפתורים) ---
     FRONTEND_URL: str = Field(
@@ -164,7 +145,7 @@ class Settings(BaseSettings):
 
     # --- Security & Auth (חובה בפרודקשן – בפיתוח ברירת מחדל) ---
     SECRET_KEY: str = Field(
-        "dev-secret-key-change-in-production",
+        "",
         description="Must be set in .env for production",
     )
     ALGORITHM: str = "HS256"
