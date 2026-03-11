@@ -8,9 +8,9 @@ RUN apt-get update && apt-get install -y \
     libpq-dev gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# העתקת רשימת הספריות והתקנתן
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# העתקת הגדרת הפרויקט והתקנת תלויות עם uv
+COPY pyproject.toml .
+RUN pip install uv && uv pip install --system -e .
 
 # העתקת שאר הקוד
 COPY . .
