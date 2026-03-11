@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: redis
-          image: redis/redis-stack:latest
+          image: redis/redis-stack:7.2.0-v10
           command:
             - sh
             - -c

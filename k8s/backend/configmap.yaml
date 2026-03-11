@@ -3,6 +3,9 @@ kind: ConfigMap
 metadata:
   name: linkup-backend-config
 data:
-  POSTGRES_HOST: "linkup-db"
-  REDIS_HOST: "linkup-redis"
   RABBITMQ_HOST: "linkup-rabbitmq"
+  RABBITMQ_PORT: "5672"
+  RABBITMQ_USER: "guest"
+  AWS_REGION: "eu-central-1"
+  S3_BUCKET_NAME: "linkup-files"
+  FRONTEND_URL: "https://linkup.co.il"
