@@ -16,8 +16,8 @@ spec:
     spec:
       containers:
         - name: chat-ws
-          image: linkup-chat-ws:latest
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/Itamarabir1/linkup-chat-ws:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8081
           env:

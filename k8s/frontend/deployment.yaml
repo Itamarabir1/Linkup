@@ -16,8 +16,8 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: linkup-frontend:latest
-          imagePullPolicy: IfNotPresent
+          image: ghcr.io/Itamarabir1/linkup-frontend:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
           resources:
