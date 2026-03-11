@@ -26,7 +26,7 @@ $$ LANGUAGE plpgsql;
 
 -- 4. טבלת משתמשים (Users)
 CREATE TABLE users (
-    user_id SERIAL PRIMARY KEY,
+    user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     full_name VARCHAR(100) NOT NULL,
     phone_number VARCHAR(20) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE,
@@ -43,11 +43,33 @@ CREATE TABLE users (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
--- 5. טבלת נסיעות (Rides)
+-- 5. טבלת קבוצות (Groups)
+CREATE TABLE groups (
+    group_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    invite_code VARCHAR(64) UNIQUE NOT NULL,
+    admin_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    is_active BOOLEAN DEFAULT TRUE NOT NULL,
+    max_members INTEGER,
+    invite_expires_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+CREATE TABLE group_members (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    group_id UUID NOT NULL REFERENCES groups(group_id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    role VARCHAR(20) NOT NULL DEFAULT 'member',
+    joined_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT uq_group_member UNIQUE (group_id, user_id)
+);
+
+-- 6. טבלת נסיעות (Rides)
 -- שים לב: כל הזמנים הומרו ל-TIMESTAMP WITH TIME ZONE למניעת שגיאות Offset
 CREATE TABLE rides (
-    ride_id SERIAL PRIMARY KEY,
-    driver_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    ride_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    driver_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    group_id UUID REFERENCES groups(group_id) ON DELETE SET NULL,
     departure_time TIMESTAMP WITH TIME ZONE NOT NULL,
     estimated_arrival_time TIMESTAMP WITH TIME ZONE,
     available_seats INTEGER NOT NULL DEFAULT 4 CHECK (available_seats BETWEEN 0 AND 8),
@@ -66,10 +88,11 @@ CREATE TABLE rides (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
--- 6. טבלת בקשות נוסעים (Passenger Requests)
+-- 7. טבלת בקשות נוסעים (Passenger Requests)
 CREATE TABLE passenger_requests (
-    request_id SERIAL PRIMARY KEY,
-    passenger_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    request_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    passenger_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    group_id UUID REFERENCES groups(group_id) ON DELETE SET NULL,
     num_passengers INTEGER NOT NULL DEFAULT 1 CHECK (num_passengers BETWEEN 1 AND 8),
     pickup_name VARCHAR(255),
     pickup_geom GEOGRAPHY(POINT, 4326) NOT NULL,
@@ -88,12 +111,12 @@ CREATE TABLE passenger_requests (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
--- 7. טבלת הזמנות (Bookings)
+-- 8. טבלת הזמנות (Bookings)
 CREATE TABLE bookings (
-    booking_id SERIAL PRIMARY KEY,
-    ride_id INTEGER NOT NULL REFERENCES rides(ride_id) ON DELETE CASCADE,
-    passenger_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    request_id INTEGER REFERENCES passenger_requests(request_id) ON DELETE SET NULL,
+    booking_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    ride_id UUID NOT NULL REFERENCES rides(ride_id) ON DELETE CASCADE,
+    passenger_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    request_id UUID REFERENCES passenger_requests(request_id) ON DELETE SET NULL,
     num_seats INTEGER NOT NULL DEFAULT 1 CHECK (num_seats BETWEEN 1 AND 8),
     pickup_point GEOGRAPHY(POINT, 4326),
     pickup_time TIMESTAMP WITH TIME ZONE,
@@ -105,20 +128,20 @@ CREATE TABLE bookings (
     CONSTRAINT unique_passenger_per_ride UNIQUE (ride_id, passenger_id)
 );
 
--- 8. טבלאות צ'אט 1:1
+-- 9. טבלאות צ'אט 1:1
 CREATE TABLE conversations (
-    conversation_id SERIAL PRIMARY KEY,
-    user_id_1 INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    user_id_2 INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    conversation_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id_1 UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    user_id_2 UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT uq_conversation_pair UNIQUE (user_id_1, user_id_2),
     CONSTRAINT ck_conversation_ordered CHECK (user_id_1 < user_id_2)
 );
 
 CREATE TABLE messages (
-    message_id SERIAL PRIMARY KEY,
-    conversation_id INTEGER NOT NULL REFERENCES conversations(conversation_id) ON DELETE CASCADE,
-    sender_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    message_id BIGSERIAL PRIMARY KEY,
+    conversation_id UUID NOT NULL REFERENCES conversations(conversation_id) ON DELETE CASCADE,
+    sender_id UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     body TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
@@ -128,7 +151,7 @@ CREATE INDEX idx_conversations_user_2 ON conversations (user_id_2);
 CREATE INDEX idx_messages_conversation ON messages (conversation_id);
 CREATE INDEX idx_messages_created ON messages (conversation_id, created_at);
 
--- 9. טבלת Outbox Events
+-- 10. טבלת Outbox Events
 -- כוללת את כל העמודות שהיו חסרות לוורקר
 CREATE TABLE outbox_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -144,16 +167,16 @@ CREATE TABLE outbox_events (
     idempotency_key VARCHAR(255) UNIQUE
 );
 
--- 10. הפעלת טריגרים לעדכון אוטומטי של updated_at
+-- 11. הפעלת טריגרים לעדכון אוטומטי של updated_at
 CREATE TRIGGER update_user_modtime BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION update_modified_column();
 CREATE TRIGGER update_ride_modtime BEFORE UPDATE ON rides FOR EACH ROW EXECUTE FUNCTION update_modified_column();
 CREATE TRIGGER update_request_modtime BEFORE UPDATE ON passenger_requests FOR EACH ROW EXECUTE FUNCTION update_modified_column();
 CREATE TRIGGER update_booking_modtime BEFORE UPDATE ON bookings FOR EACH ROW EXECUTE FUNCTION update_modified_column();
 
--- 11. טבלת ניתוח AI של שיחות צ'אט
+-- 12. טבלת ניתוח AI של שיחות צ'אט
 CREATE TABLE chat_analysis (
-    analysis_id SERIAL PRIMARY KEY,
-    conversation_id INTEGER NOT NULL REFERENCES conversations(conversation_id) ON DELETE CASCADE,
+    analysis_id BIGSERIAL PRIMARY KEY,
+    conversation_id UUID NOT NULL REFERENCES conversations(conversation_id) ON DELETE CASCADE,
     driver_name VARCHAR(255),
     passenger_name VARCHAR(255),
     pickup_location TEXT,
@@ -166,7 +189,7 @@ CREATE TABLE chat_analysis (
 
 CREATE INDEX idx_chat_analysis_conversation ON chat_analysis (conversation_id);
 
--- 12. אינדקסים לביצועים וגיאוגרפיה
+-- 13. אינדקסים לביצועים וגיאוגרפיה
 CREATE INDEX idx_users_location ON users USING GIST(last_location);
 CREATE INDEX idx_rides_origin_geom ON rides USING GIST(origin_geom);
 CREATE INDEX idx_rides_destination_geom ON rides USING GIST(destination_geom);

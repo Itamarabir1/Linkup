@@ -1,6 +1,8 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Text
+import uuid
+from sqlalchemy import Column, String, Integer, DateTime, Boolean, Text
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from app.db.base import Base
 from geoalchemy2 import Geography  # שימוש ב-Geography עבור PostGIS
 
@@ -14,7 +16,7 @@ class User(Base):
     __tablename__ = "users"
 
     # מזהה ייחודי
-    user_id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     full_name = Column(String(100), nullable=False)
     phone_number = Column(String(20), unique=True, index=True, nullable=False)
     email = Column(String(255), unique=True, index=True, nullable=True)
@@ -22,6 +24,7 @@ class User(Base):
 
     # אימות וניהול חשבון
     is_verified = Column(Boolean, default=False, nullable=False, server_default="false")
+    google_id = Column(String(255), nullable=True)  # Google OAuth 'sub' – קישור חשבון קיים ל-Google
     is_active = Column(Boolean, default=True, server_default="true")
     is_admin = Column(Boolean, default=False, server_default="false")
 
@@ -69,6 +72,11 @@ class User(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
     )
+
+    # 4. קבוצות שהמשתמש מנהל
+    owned_groups = relationship("Group", back_populates="admin")
+    # 5. חברויות בקבוצות
+    group_memberships = relationship("GroupMember", back_populates="user")
 
     def __repr__(self):
         return f"<User(user_id={self.user_id}, full_name='{self.full_name}', phone='{self.phone_number}')>"

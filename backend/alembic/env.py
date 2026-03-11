@@ -12,18 +12,14 @@ sys.path.insert(0, os.path.realpath(os.path.join(os.path.dirname(__file__), '..'
 from app.core.config import settings
 from app.db.base import Base
 
-# 2. ייבוא ה-settings וה-Base
-from app.core.config import settings
-from app.db.base import Base
-
-# --- ייבוא מודלים לרישום ב-Metadata (הפתרון לבעיה שלך) ---
-# הייבואים האלו גורמים ל-Base "להכיר" את הטבלאות לפני שהמיגרציה רצה
+# --- ייבוא מודלים לרישום ב-Metadata ---
 from app.domain.users.model import User
 from app.domain.rides.model import Ride
 from app.domain.bookings.model import Booking
-from app.domain.passengers.model import PassengerRequest # וודא שהנתיב מדויק אצלך
+from app.domain.passengers.model import PassengerRequest
+from app.domain.groups.model import Group, GroupMember
+from app.domain.chat.model import Conversation, Message, ChatAnalysis
 from app.infrastructure.outbox.model import OutboxEvent
-# ---------------------------------------------------------
 
 config = context.config
 

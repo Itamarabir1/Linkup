@@ -11,8 +11,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM, UUID as PG_UUID
 from geoalchemy2 import Geography  # שימוש ב-Geography לסנכרון עם ה-SQL
+import uuid
 from app.db.base import Base
 from app.domain.passengers.enum import PassengerStatus
 
@@ -45,11 +46,16 @@ class PassengerRequest(Base):
 
     __tablename__ = "passenger_requests"
 
-    request_id = Column(Integer, primary_key=True, index=True)
+    request_id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
 
     # FK למשתמש הפיזי
     passenger_id = Column(
-        Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
+        PG_UUID(as_uuid=True), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False
+    )
+    group_id = Column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("groups.group_id", ondelete="SET NULL"),
+        nullable=True,
     )
 
     # נתונים פיזיים
@@ -99,6 +105,7 @@ class PassengerRequest(Base):
 
     # מקשר חזרה ל-User.passenger_requests
     user = relationship("User", back_populates="passenger_requests")
+    group = relationship("Group")
 
     # מקשר לבוקינגס שנוצרו מהבקשה הזו
     bookings = relationship(
