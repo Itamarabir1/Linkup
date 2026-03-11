@@ -24,3 +24,7 @@ api_router.include_router(user_router, prefix="/users", tags=["Users"])
 api_router.include_router(auth_router, prefix="/auth", tags=["Auth"])
 api_router.include_router(geo_router, prefix="/geo", tags=["Geo"])
 api_router.include_router(chat_router, prefix="/chat", tags=["Chat"])
+
+# Groups last to avoid circular import (User <-> Group via app.db.models)
+from app.api.v1.routers.groups import router as groups_router
+api_router.include_router(groups_router, prefix="/groups", tags=["Groups"])
