@@ -1,0 +1,104 @@
+.page {
+  padding: 1rem 1.5rem;
+  max-width: 480px;
+  margin: 0 auto;
+  text-align: right;
+}
+
+.pageTitle {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.pageError {
+  color: #dc2626;
+  margin-bottom: 1rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.label {
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.input {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  text-align: right;
+}
+
+.btn {
+  display: inline-block;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  text-align: center;
+}
+
+.btnPrimary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.btnPrimary:hover {
+  background: #1d4ed8;
+}
+
+.btnPrimary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.successSection {
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+}
+
+.successTitle {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.inviteRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.inviteInput {
+  flex: 1;
+  min-width: 180px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  direction: ltr;
+  text-align: left;
+}
+
+.copiedToast {
+  font-size: 0.9rem;
+  color: #059669;
+}
+
+.redirectNote {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin-top: 1rem;
+}

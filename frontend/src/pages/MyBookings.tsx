@@ -7,10 +7,10 @@ import { formatDateTimeNoSeconds } from '../utils/date';
 import styles from './MyBookings.module.css';
 
 interface BookingRow {
-  booking_id: number;
-  ride_id: number;
-  request_id: number;
-  passenger_id: number;
+  booking_id: string;
+  ride_id: string;
+  request_id: string;
+  passenger_id: string;
   num_seats: number;
   status: string;
   reminder_sent?: boolean;
@@ -22,14 +22,14 @@ interface BookingRow {
 /** הזמנות שבהן אני נוסע – מבוקינג + פרטי נסיעה + שם נהג */
 interface PassengerBookingItem {
   ride: Ride;
-  bookingId: number;
+  bookingId: string;
   bookingStatus: string;
   driverName: string | null;
 }
 
 /** נוסע בנסיעה שלי (כנהג) */
 interface PassengerInRide {
-  bookingId: number;
+  bookingId: string;
   passengerName: string;
   numSeats: number;
   status: string;
@@ -54,8 +54,8 @@ export default function MyBookings() {
   const [passengerLoading, setPassengerLoading] = useState(true);
   const [driverLoading, setDriverLoading] = useState(false);
   const [error, setError] = useState('');
-  const [chatLoading, setChatLoading] = useState<number | null>(null);
-  const [bookingToCancel, setBookingToCancel] = useState<number | null>(null);
+  const [chatLoading, setChatLoading] = useState<string | null>(null);
+  const [bookingToCancel, setBookingToCancel] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [selectedPassenger, setSelectedPassenger] = useState<PassengerInRide | null>(null);
 
@@ -70,7 +70,7 @@ export default function MyBookings() {
       const asPassenger = (Array.isArray(bookings) ? bookings : []).filter(
         (b) => b.passenger_id === user.user_id && (b.status === 'pending_approval' || b.status === 'confirmed')
       );
-      const byRideId = new Map<number, BookingRow>();
+      const byRideId = new Map<string, BookingRow>();
       asPassenger.forEach((b) => {
         if (!byRideId.has(b.ride_id)) byRideId.set(b.ride_id, b);
       });
@@ -119,7 +119,7 @@ export default function MyBookings() {
       await Promise.all(
         activeRides.map(async (ride) => {
           try {
-            const manifestRes = await api.get<{ passengers: Array<{ booking_id: number; passenger_name: string; num_seats: number; status: string; pickup_name?: string | null; pickup_time?: string | null }> }>(
+            const manifestRes = await api.get<{ passengers: Array<{ booking_id: string; passenger_name: string; num_seats: number; status: string; pickup_name?: string | null; pickup_time?: string | null }> }>(
               `/bookings/ride/${ride.ride_id}/manifest`,
               { params: { driver_id: user.user_id } }
             );
@@ -166,7 +166,7 @@ export default function MyBookings() {
     if (activeTab === 'driver') fetchDriverBookings();
   }, [activeTab, fetchDriverBookings]);
 
-  const handleOpenChat = async (bookingId: number) => {
+  const handleOpenChat = async (bookingId: string) => {
     setChatLoading(bookingId);
     setError('');
     try {

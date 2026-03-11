@@ -12,8 +12,8 @@ export default function Notifications() {
   const [list, setList] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [actionBookingId, setActionBookingId] = useState<number | null>(null);
-  const [chatLoading, setChatLoading] = useState<number | null>(null);
+  const [actionBookingId, setActionBookingId] = useState<string | null>(null);
+  const [chatLoading, setChatLoading] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
 
   const fetchNotifications = useCallback(async () => {
@@ -34,7 +34,7 @@ export default function Notifications() {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  const handleApprove = async (bookingId: number) => {
+  const handleApprove = async (bookingId: string) => {
     if (!user?.user_id) return;
     setActionBookingId(bookingId);
     setError('');
@@ -55,7 +55,7 @@ export default function Notifications() {
     }
   };
 
-  const handleReject = async (bookingId: number) => {
+  const handleReject = async (bookingId: string) => {
     if (!user?.user_id) return;
     setActionBookingId(bookingId);
     setError('');
@@ -76,7 +76,7 @@ export default function Notifications() {
     }
   };
 
-  const handleOpenChat = async (bookingId: number) => {
+  const handleOpenChat = async (bookingId: string) => {
     setChatLoading(bookingId);
     setError('');
     try {

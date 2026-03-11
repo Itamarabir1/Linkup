@@ -7,7 +7,7 @@ import { API_BASE_URL } from '../config/env';
 import { useAuth } from '../context/AuthContext';
 import styles from './MyRides.module.css';
 
-function getRideWsUrl(rideId: number): string {
+function getRideWsUrl(rideId: string): string {
   const base = API_BASE_URL.startsWith('http')
     ? API_BASE_URL.replace(/^http/, 'ws')
     : (typeof window !== 'undefined'
@@ -21,9 +21,9 @@ export default function MyRides() {
   const [rides, setRides] = useState<Ride[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [rideToCancel, setRideToCancel] = useState<number | null>(null);
+  const [rideToCancel, setRideToCancel] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
-  const wsRefs = useRef<Map<number, WebSocket>>(new Map());
+  const wsRefs = useRef<Map<string, WebSocket>>(new Map());
 
   const fetchRides = useCallback(async () => {
     try {

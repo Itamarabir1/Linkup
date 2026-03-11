@@ -22,7 +22,7 @@ export default function MessageThread() {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const cid = conversationId ? parseInt(conversationId, 10) : NaN;
+  const cid = conversationId ?? '';
 
   const fetchConversation = useCallback(async () => {
     if (!cid || !user?.user_id) return;
@@ -86,7 +86,7 @@ export default function MessageThread() {
     );
   }
 
-  const partnerName = conversation?.partner?.full_name || `שיחה #${cid}`;
+  const partnerName = conversation?.partner?.full_name || (cid ? `שיחה` : '');
 
   return (
     <div className={styles.page} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>

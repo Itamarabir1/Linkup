@@ -14,15 +14,15 @@ export default function SearchRides() {
   const [departureDate, setDepartureDate] = useState('');
   const [departureTime, setDepartureTime] = useState('');
   const [results, setResults] = useState<Ride[]>([]);
-  const [currentRequestId, setCurrentRequestId] = useState<number | null>(null);
+  const [currentRequestId, setCurrentRequestId] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState('');
   const [locationLoading, setLocationLoading] = useState(false);
-  const [driverInfoMap, setDriverInfoMap] = useState<Record<number, DriverInfo>>({});
-  const [loadingDriverRideId, setLoadingDriverRideId] = useState<number | null>(null);
-  const [sendingRequestRideId, setSendingRequestRideId] = useState<number | null>(null);
-  const [requestSuccessRideId, setRequestSuccessRideId] = useState<number | null>(null);
-  const [requestErrorRideId, setRequestErrorRideId] = useState<number | null>(null);
+  const [driverInfoMap, setDriverInfoMap] = useState<Record<string, DriverInfo>>({});
+  const [loadingDriverRideId, setLoadingDriverRideId] = useState<string | null>(null);
+  const [sendingRequestRideId, setSendingRequestRideId] = useState<string | null>(null);
+  const [requestSuccessRideId, setRequestSuccessRideId] = useState<string | null>(null);
+  const [requestErrorRideId, setRequestErrorRideId] = useState<string | null>(null);
   const [requestErrorMessage, setRequestErrorMessage] = useState<string>('');
 
   const fillPickupFromMyLocation = () => {
@@ -92,7 +92,7 @@ export default function SearchRides() {
     }
   };
 
-  const fetchDriverInfo = async (rideId: number) => {
+  const fetchDriverInfo = async (rideId: string) => {
     setLoadingDriverRideId(rideId);
     setError('');
     try {

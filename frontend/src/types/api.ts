@@ -1,5 +1,5 @@
 export interface User {
-  user_id: number;
+  user_id: string;
   email: string;
   full_name?: string;
   first_name?: string;
@@ -16,8 +16,9 @@ export interface LoginResponse {
 }
 
 export interface Ride {
-  ride_id: number;
-  driver_id: number;
+  ride_id: string;
+  driver_id: string;
+  group_id?: string | null;
   origin_name: string | null;
   destination_name: string | null;
   departure_time: string;
@@ -35,12 +36,13 @@ export interface Ride {
 
 export interface RideSearchResponse {
   rides: Ride[];
-  request_id: number | null;
+  request_id: string | null;
 }
 
 export interface PassengerRequest {
-  request_id: number;
-  passenger_id: number;
+  request_id: string;
+  passenger_id: string;
+  group_id?: string | null;
   num_passengers: number;
   pickup_name: string | null;
   destination_name: string | null;
@@ -77,10 +79,10 @@ export interface DriverInfo {
 }
 
 export interface Booking {
-  booking_id: number;
-  ride_id: number;
-  request_id: number;
-  passenger_id: number;
+  booking_id: string;
+  ride_id: string;
+  request_id: string;
+  passenger_id: string;
   num_seats: number;
   status: string;
   reminder_sent: boolean;
@@ -94,10 +96,32 @@ export interface NotificationItem {
   title: string;
   body: string | null;
   created_at: string;
-  booking_id: number;
-  ride_id: number;
+  booking_id: string;
+  ride_id: string;
   other_party_name: string | null;
   ride_origin: string | null;
   ride_destination: string | null;
   status: string | null;
+}
+
+export interface Group {
+  group_id: string;
+  name: string;
+  invite_code: string;
+  admin_id: string;
+  is_active: boolean;
+  max_members?: number | null;
+  invite_expires_at?: string | null;
+  created_at: string;
+  member_count?: number;
+}
+
+export interface GroupMember {
+  id: string;
+  group_id: string;
+  user_id: string;
+  role: 'admin' | 'member';
+  joined_at: string;
+  full_name?: string;
+  avatar_url?: string | null;
 }

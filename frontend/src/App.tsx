@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { GroupProvider } from './context/GroupContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -13,6 +14,9 @@ import Notifications from './pages/Notifications';
 import Messages from './pages/Messages';
 import MessageThread from './pages/MessageThread';
 import Profile from './pages/Profile';
+import CreateGroup from './pages/CreateGroup';
+import GroupManage from './pages/GroupManage';
+import JoinGroup from './pages/JoinGroup';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -49,6 +53,9 @@ function AppRoutes() {
         <Route path="messages" element={<Messages />} />
         <Route path="messages/:conversationId" element={<MessageThread />} />
         <Route path="profile" element={<Profile />} />
+        <Route path="groups/new" element={<CreateGroup />} />
+        <Route path="groups/:groupId" element={<GroupManage />} />
+        <Route path="join/:inviteCode" element={<JoinGroup />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -59,7 +66,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <GroupProvider>
+          <AppRoutes />
+        </GroupProvider>
       </AuthProvider>
     </BrowserRouter>
   );

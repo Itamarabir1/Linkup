@@ -1,0 +1,70 @@
+.page {
+  padding: 1rem 1.5rem;
+  max-width: 480px;
+  margin: 0 auto;
+  text-align: right;
+}
+
+.pageTitle {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.pageError,
+.pageLoading {
+  text-align: center;
+  color: #6b7280;
+  padding: 2rem;
+}
+
+.pageError {
+  color: #dc2626;
+}
+
+.card {
+  background: #fff;
+  padding: 1.5rem;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  margin-bottom: 1rem;
+}
+
+.groupName {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.memberCount {
+  font-size: 0.95rem;
+  color: #6b7280;
+  margin-bottom: 1.25rem;
+}
+
+.btn {
+  display: inline-block;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.btnPrimary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.btnPrimary:hover {
+  background: #1d4ed8;
+}
+
+.btnPrimary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}

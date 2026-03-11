@@ -1,0 +1,226 @@
+.page {
+  padding: 1rem 1.5rem;
+  max-width: 700px;
+  margin: 0 auto;
+  text-align: right;
+}
+
+.pageTitle {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.pageError,
+.pageLoading,
+.emptyText {
+  text-align: center;
+  color: #6b7280;
+  padding: 2rem;
+}
+
+.pageError {
+  color: #dc2626;
+}
+
+.groupNameWrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.groupNameInput {
+  font-size: 1.5rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  min-width: 200px;
+  text-align: right;
+}
+
+.inviteSection {
+  background: #f9fafb;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
+  border: 1px solid #e5e7eb;
+}
+
+.inviteLabel {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+}
+
+.inviteRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.inviteInput {
+  flex: 1;
+  min-width: 180px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  direction: ltr;
+  text-align: left;
+}
+
+.btn {
+  display: inline-block;
+  padding: 0.6rem 1.2rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  text-align: center;
+}
+
+.btnPrimary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.btnPrimary:hover {
+  background: #1d4ed8;
+}
+
+.btnOutline {
+  background: transparent;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.btnOutline:hover {
+  background: #f3f4f6;
+}
+
+.btnDanger {
+  background: #dc2626;
+  color: #fff;
+}
+
+.btnDanger:hover {
+  background: #b91c1c;
+}
+
+.membersTitle {
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+}
+
+.memberList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.memberRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.memberInfo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.memberName {
+  font-weight: 500;
+}
+
+.roleBadge {
+  font-size: 0.75rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.roleBadgeAdmin {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.memberActions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.memberActions .btn {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.actionsSection {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.confirmModalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+.confirmModalBox {
+  background: #fff;
+  border-radius: 12px;
+  padding: 1.5rem;
+  max-width: 360px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+.confirmModalTitle {
+  font-size: 1.1rem;
+  margin: 0 0 1rem 0;
+  color: #111;
+}
+
+.confirmModalActions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  margin-top: 1.25rem;
+}
+
+.confirmModalActions .btn {
+  width: 120px;
+  min-width: 120px;
+  padding: 0.6rem 1rem;
+  margin: 0;
+  box-sizing: border-box;
+}
+
+.copiedToast {
+  font-size: 0.9rem;
+  color: #059669;
+  margin-right: 0.5rem;
+}
