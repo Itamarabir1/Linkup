@@ -14,6 +14,8 @@ spec:
       labels:
         app: linkup-frontend
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: frontend
           image: ghcr.io/Itamarabir1/linkup-frontend:latest
