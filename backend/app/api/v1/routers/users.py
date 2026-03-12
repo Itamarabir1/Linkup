@@ -1,10 +1,9 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.api.dependencies.auth import get_current_user
-from app.api.dependencies.file import validate_avatar
 from app.domain.users.service import user_service
 from app.domain.users.model import User
 from app.domain.users.schema import (
@@ -97,33 +96,18 @@ async def confirm_avatar_upload(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    מאשר העלאה לאחר שהלקוח העלה ישירות ל-S3 באמצעות presigned URL.
-    דוחף אירוע לתור ומחזיר 202 מיד - העיבוד (finalize + DB update) מתבצע ברקע.
+    מאשר העלאה לאחר שהלקוח העלה ישירות ל-S3. מעדכן avatar_key ב-DB מיידית ודוחף אירוע לתור.
+    העיבוד (resize ל-3 גדלים) מתבצע ברקע. staging_key חייב להתחיל ב-avatars/staging/{user_id}_.
     """
-    await user_service.confirm_avatar_upload(db, current_user, data.staging_key)
-    return AvatarUploadAcceptedResponse()
-
-
-# דרך 2: העלאה דרך API (streaming ישירות, בלי tempfile)
-@router.post(
-    "/me/avatar",
-    response_model=AvatarUploadAcceptedResponse,
-    status_code=status.HTTP_202_ACCEPTED,
-)
-async def upload_my_avatar(
-    file: UploadFile = Depends(validate_avatar),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    מעלה תמונת פרופיל דרך API (streaming ישירות מ-UploadFile ל-S3, בלי tempfile).
-    אם יש תמונה קיימת – מוחק מענן ומ-DB ואז מעלה את החדשה.
-    מחזיר 202 (התמונה בהעלאה) – העיבוד (S3 + עדכון DB) מתבצע ברקע.
-    בפרונט: להציג "התמונה בהעלאה" ולעדכן את avatar_url כשמוכן (polling GET /me או WebSocket).
-
-    הערה: מומלץ להשתמש ב-GET /me/avatar/upload-url + POST /me/avatar/confirm לקבלת 202 מהיר יותר.
-    """
-    await user_service.schedule_avatar_upload(db, current_user, file)
+    try:
+        await user_service.confirm_avatar_upload(db, current_user, data.staging_key)
+    except ValueError as e:
+        if "staging_key" in str(e).lower() or "current user" in str(e).lower():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Invalid or unauthorized staging_key",
+            ) from e
+        raise
     return AvatarUploadAcceptedResponse()
 
 
@@ -137,12 +121,11 @@ async def remove_my_avatar(
     current_user: User = Depends(get_current_user),
 ):
     """
-    מסיר תמונת פרופיל: דוחף אירוע לתור ומחזיר 202 מיד.
-    העיבוד (מחיקה מ-S3) מתבצע ברקע על ידי ה-worker.
+    מסיר תמונת פרופיל: מוחק את תיקיית avatars/{user_id}/ מ-S3 ומאפס avatar_key ב-DB.
     """
     await user_service.remove_avatar(db, user_id=current_user.user_id)
     return AvatarUploadAcceptedResponse(
-        message="Avatar removal accepted", status="accepted"
+        message="Avatar removed", status="accepted"
     )
 
 

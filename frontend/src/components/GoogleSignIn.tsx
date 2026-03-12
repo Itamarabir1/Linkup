@@ -51,7 +51,6 @@ export default function GoogleSignIn({ onError, disabled }: GoogleSignInProps) {
 
     // בדיקה אם כבר אתחלנו - מונע קריאות כפולות
     if (initialized || scriptLoaded) {
-      console.log('[GoogleSignIn] Already initialized/loaded, skipping script load...');
       return;
     }
 
@@ -64,27 +63,16 @@ export default function GoogleSignIn({ onError, disabled }: GoogleSignInProps) {
       
       // בדיקה אם כבר אתחלנו (מונע קריאות כפולות)
       if (initializedRef.current) {
-        console.log('[GoogleSignIn] Already initialized (ref check), skipping...');
         return true;
       }
       
       const currentOrigin = window.location.origin;
-      const currentHost = window.location.host;
-      const currentProtocol = window.location.protocol;
-      
-      console.log('[GoogleSignIn] Initializing with:');
-      console.log('  - Client ID:', googleClientId);
-      console.log('  - Origin:', currentOrigin);
-      console.log('  - Host:', currentHost);
-      console.log('  - Protocol:', currentProtocol);
-      console.log('  - Full URL:', window.location.href);
       
       try {
         // אתחול עם הגדרות נוספות שיכולות לעזור
         window.google.accounts.id.initialize({
           client_id: googleClientId,
           callback: async (response: { credential: string }) => {
-            console.log('[GoogleSignIn] Callback called with credential');
             if (callbackRef.current) {
               await callbackRef.current(response);
             }
@@ -93,7 +81,6 @@ export default function GoogleSignIn({ onError, disabled }: GoogleSignInProps) {
           cancel_on_tap_outside: true,
           itp_support: true, // תמיכה ב-Intelligent Tracking Prevention
         });
-        console.log('[GoogleSignIn] ✅ Google Identity Services initialized successfully');
         initializedRef.current = true;
         setInitialized(true);
         return true;
@@ -122,7 +109,6 @@ export default function GoogleSignIn({ onError, disabled }: GoogleSignInProps) {
       const checkInterval = setInterval(() => {
         checkCount++;
         if (window.google?.accounts?.id) {
-          console.log('Google Identity Services loaded successfully');
           clearInterval(checkInterval);
           initializeGoogleSignIn();
           setScriptLoaded(true);
@@ -138,13 +124,11 @@ export default function GoogleSignIn({ onError, disabled }: GoogleSignInProps) {
     }
 
     // טעינת ה-script
-    console.log('Loading Google Identity Services script...');
     const script = document.createElement('script');
     script.src = 'https://accounts.google.com/gsi/client';
     script.async = true;
     script.defer = true;
     script.onload = () => {
-      console.log('Google Identity Services script loaded');
       // מחכים קצת כדי לוודא שה-API זמין ואז מאתחלים מיד
       setTimeout(() => {
         if (window.google?.accounts?.id) {
@@ -202,72 +186,14 @@ export default function GoogleSignIn({ onError, disabled }: GoogleSignInProps) {
     const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
     if (!googleClientId) return;
 
-    // בדיקת ה-origin המדויק
-    const currentOrigin = window.location.origin;
-    console.log('Current origin:', currentOrigin);
-    console.log('Google Client ID:', googleClientId);
-    console.log('Rendering Google Sign-In button...');
-
     try {
-      // רינדור הכפתור (ה-initialize כבר נקרא ב-useEffect הקודם)
       if (buttonRef.current) {
         const currentOrigin = window.location.origin;
-        const currentHost = window.location.host;
-        const currentProtocol = window.location.protocol;
-        
-        console.log('[GoogleSignIn] ========================================');
-        console.log('[GoogleSignIn] 🔍 DEBUG INFO FOR BUTTON RENDERING:');
-        console.log('[GoogleSignIn]   Origin:', currentOrigin);
-        console.log('[GoogleSignIn]   Host:', currentHost);
-        console.log('[GoogleSignIn]   Protocol:', currentProtocol);
-        console.log('[GoogleSignIn]   Full URL:', window.location.href);
-        console.log('[GoogleSignIn]   Client ID:', googleClientId);
-        console.log('[GoogleSignIn]   Script loaded:', scriptLoaded);
-        console.log('[GoogleSignIn]   Initialized:', initialized);
-        console.log('[GoogleSignIn] ========================================');
-        console.log('[GoogleSignIn] 📋 VERIFICATION CHECKLIST:');
-        console.log('[GoogleSignIn] ✅ VERIFICATION CHECKLIST:');
-        console.log('');
-        console.log('[GoogleSignIn] 🔍 שלב 0: בדיקת Client ID');
-        console.log(`[GoogleSignIn]    Client ID: ${googleClientId}`);
-        console.log('[GoogleSignIn]    ✅ ודא שה-Client ID הזה שייך לפרויקט הנכון ב-Google Cloud Console');
-        console.log('[GoogleSignIn]    ✅ ודא שה-Client ID הזה הוא מסוג "Web application" (לא iOS/Android)');
-        console.log('');
-        console.log('[GoogleSignIn] 📋 שלב 1: Authorized JavaScript Origins');
-        console.log('[GoogleSignIn]    Go to: https://console.cloud.google.com/apis/credentials');
-        console.log(`[GoogleSignIn]    Click on Client ID: ${googleClientId}`);
-        console.log('[GoogleSignIn]    Under "Authorized JavaScript origins", ADD BOTH:');
-        console.log(`[GoogleSignIn]    - ${currentOrigin} (with port)`);
-        console.log('[GoogleSignIn]    - http://localhost (without port)');
-        console.log('[GoogleSignIn]    ⚠️  חשוב: ודא שאין רווחים או תווים נוספים');
-        console.log('[GoogleSignIn]    Click "Save" and wait 10-30 seconds');
-        console.log('');
-        console.log('[GoogleSignIn] 📋 שלב 2: OAuth Consent Screen');
-        console.log('[GoogleSignIn]    Go to: https://console.cloud.google.com/apis/credentials/consent');
-        console.log('[GoogleSignIn]    Check "Publishing status":');
-        console.log('[GoogleSignIn]    - If "Testing" → Add your email as a test user');
-        console.log('[GoogleSignIn]    - Or change to "In production" (requires verification)');
-        console.log('[GoogleSignIn]    ⚠️  חשוב: אם זה "Testing", רק test users יכולים להתחבר');
-        console.log('');
-        console.log('[GoogleSignIn] 📋 שלב 3: בדיקת Project');
-        console.log('[GoogleSignIn]    ודא שאתה בפרויקט הנכון ב-Google Cloud Console');
-        console.log('[GoogleSignIn]    Project ID מ-Firebase: linkup-app-df18d');
-        console.log('[GoogleSignIn]    ודא שה-OAuth Client ID שייך לאותו פרויקט');
-        console.log('');
-        console.log('[GoogleSignIn] 📋 שלב 4: Clear Cache & Test');
-        console.log('[GoogleSignIn]    - Clear browser cache (Ctrl+Shift+Delete)');
-        console.log('[GoogleSignIn]    - Try incognito/private window');
-        console.log('[GoogleSignIn]    - Disable browser extensions (ad blockers)');
-        console.log('[GoogleSignIn] ========================================');
         
         // ניקוי הכפתור הקודם אם יש
         buttonRef.current.innerHTML = '';
         
         try {
-          console.log('[GoogleSignIn] 🎨 Attempting to render button...');
-          
-          // ניסיון עם GoogleOneTap במקום renderButton (אם renderButton נכשל)
-          // אבל קודם ננסה renderButton
           try {
             window.google!.accounts.id.renderButton(buttonRef.current, {
               theme: 'outline',
@@ -275,10 +201,8 @@ export default function GoogleSignIn({ onError, disabled }: GoogleSignInProps) {
               text: 'signin_with',
               width: 300,
             });
-            console.log('[GoogleSignIn] ✅ Button rendered successfully');
           } catch (renderErr) {
-            console.error('[GoogleSignIn] ❌ renderButton failed, trying alternative approach...');
-            console.error('[GoogleSignIn] Error:', renderErr);
+            console.error('[GoogleSignIn] renderButton failed, using fallback:', renderErr instanceof Error ? renderErr.message : renderErr);
             const renderMsg = renderErr instanceof Error ? renderErr.message : String(renderErr);
             const isOriginError = /origin|not allowed|403|client id/i.test(renderMsg);
             if (isOriginError && onError) {
@@ -319,7 +243,6 @@ export default function GoogleSignIn({ onError, disabled }: GoogleSignInProps) {
               const manualButton = buttonRef.current.querySelector('#google-signin-button');
               if (manualButton) {
                 manualButton.addEventListener('click', () => {
-                  console.log('[GoogleSignIn] Manual button clicked, trying GoogleOneTap...');
                   window.google!.accounts.id.prompt((notification) => {
                     if (notification.isNotDisplayed || notification.isSkippedMoment) {
                       console.error('[GoogleSignIn] GoogleOneTap not available:', notification);
@@ -335,26 +258,13 @@ export default function GoogleSignIn({ onError, disabled }: GoogleSignInProps) {
             throw renderErr;
           }
         } catch (renderErr) {
-          console.error('[GoogleSignIn] ❌ Button rendering error:', renderErr);
-          if (renderErr instanceof Error) {
-            console.error('[GoogleSignIn] Error name:', renderErr.name);
-            console.error('[GoogleSignIn] Error message:', renderErr.message);
-            console.error('[GoogleSignIn] Error stack:', renderErr.stack);
-          }
+          console.error('[GoogleSignIn] Button rendering error:', renderErr instanceof Error ? renderErr.message : renderErr);
           // לא זורקים שגיאה כאן כדי שהכפתור הידני יוכל לעבוד
         }
       }
     } catch (err) {
-      console.error('[GoogleSignIn] ❌ Google Sign-In button rendering error:', err);
+      console.error('[GoogleSignIn] Google Sign-In button error:', err instanceof Error ? err.message : err);
       const currentOrigin = window.location.origin;
-      console.error('[GoogleSignIn] Current origin:', currentOrigin);
-      console.error('[GoogleSignIn] Client ID:', googleClientId);
-      console.error('[GoogleSignIn] Please verify in Google Cloud Console:');
-      console.error('  1. Go to APIs & Services > Credentials');
-      console.error('  2. Click on your OAuth Client ID');
-      console.error(`  3. Under "Authorized JavaScript origins", ensure "${currentOrigin}" is listed`);
-      console.error('  4. Click "Save" and wait 10-30 seconds');
-      
       if (onError) {
         onError(`שגיאה ביצירת כפתור Google Sign-In. Origin: ${currentOrigin}. בדוק שה-origin מוגדר ב-Google Cloud Console.`);
       }

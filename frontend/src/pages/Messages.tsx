@@ -66,9 +66,39 @@ export default function Messages() {
                 color: 'inherit',
               }}
             >
-              <div className={styles.cardRoute} style={{ fontWeight: 600 }}>
-                {c.partner.full_name || `משתמש #${c.partner.user_id}`}
-              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                {c.partner.avatar_url ? (
+                  <img
+                    src={c.partner.avatar_url}
+                    alt=""
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: '50%',
+                      objectFit: 'cover',
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: '50%',
+                      background: 'var(--surface, #e5e7eb)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1rem',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {(c.partner.full_name || '?').charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <div className={styles.cardRoute} style={{ fontWeight: 600 }}>
+                    {c.partner.full_name || `משתמש #${c.partner.user_id}`}
+                  </div>
               {c.last_message_preview && (
                 <div className={styles.cardMeta} style={{ marginTop: '0.25rem', color: '#6b7280' }}>
                   {c.last_message_preview}
@@ -79,6 +109,8 @@ export default function Messages() {
                   {formatDateTimeNoSeconds(c.last_message_at)}
                 </div>
               )}
+                </div>
+              </div>
             </Link>
           ))
         )}

@@ -318,9 +318,7 @@ class AuthService:
                 db, obj_in=user_create, hashed_password=hashed_password
             )
 
-            # עדכון שדות נוספים מ-Google
-            if google_user.get("picture"):
-                user.avatar_url = google_user["picture"]
+            # עדכון שדות נוספים מ-Google (avatar_key נשאר None — אווטאר מ-S3 רק בהעלאה מפורשת)
             user.is_verified = True  # Google כבר מאמת את ה-email
 
             await db.commit()

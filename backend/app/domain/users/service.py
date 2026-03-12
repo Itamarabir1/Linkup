@@ -1,6 +1,5 @@
 import logging
 from typing import Optional
-from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # 1. Core, Security & Exceptions
@@ -37,48 +36,8 @@ class UserService:
             raise UserNotFoundError(user_id=user_id)
         return user
 
-    async def schedule_avatar_upload(
-        self, db: AsyncSession, user: User, file: UploadFile
-    ) -> None:
-        """
-        מעלה תמונת פרופיל דרך API: אם יש תמונה קיימת – מוחק אותה מה-S3 (לפי URL, מהיר),
-        אז מעלה את החדשה ל-staging וכותב לאוטבוקס.
-        ה-worker יעבד ברקע: finalize ל-S3 (שם קובץ = slug משם המשתמש) + עדכון avatar_url במסד.
-        העלאה מתבצעת באמצעות streaming ישירות מ-UploadFile ל-S3 (בלי tempfile).
-        """
-        # מחיקה לפי user_id (מכסה גם מקרים של שינוי שם)
-        try:
-            await self.s3.delete_avatar_by_user_id(user.user_id)
-            logger.info("Deleted old avatar(s) for user %s", user.user_id)
-        except Exception as e:
-            # לא נכשל אם המחיקה נכשלה - רק נרישום warning
-            logger.warning(
-                "Could not delete old avatar(s) for user %s: %s", user.user_id, e
-            )
-
-        # מאפס avatar_url ב-DB (כדי שהמשתמש יראה שהתמונה מתעדכנת)
-        await self.crud.update(db, db_obj=user, obj_in={"avatar_url": None})
-
-        # מעלה את התמונה החדשה ל-staging (streaming ישירות, בלי tempfile)
-        staging_key = await self.s3.upload_avatar_to_staging(
-            file=file, user_id=user.user_id
-        )
-
-        # דוחף אירוע לתור - ה-worker יעשה finalize ברקע
-        await publish_to_outbox(
-            db,
-            event_name="user.avatar_upload",
-            payload={"user_id": user.user_id, "staging_key": staging_key},
-        )
-        await db.commit()
-        logger.info(
-            "Avatar upload scheduled for user %s (staging_key=%s)",
-            user.user_id,
-            staging_key,
-        )
-
     async def get_avatar_upload_url(
-        self, user_id: int, filename: Optional[str] = None, expiration: int = 300
+        self, user_id, filename: Optional[str] = None, expiration: int = 300
     ) -> tuple[str, str]:
         """
         מחזיר presigned URL להעלאה ישירה ל-S3 staging.
@@ -96,30 +55,29 @@ class UserService:
         self, db: AsyncSession, user: User, staging_key: str
     ) -> None:
         """
-        מאשר העלאה לאחר שהלקוח העלה ישירות ל-S3 באמצעות presigned URL.
-        דוחף אירוע לתור לעיבוד ברקע (finalize + DB update).
+        מאשר העלאה לאחר שהלקוח העלה ישירות ל-S3. מעדכן avatar_key ב-DB מיידית (אופטימי)
+        ודוחף אירוע לתור לעיבוד ברקע (resize + העלאה ל-avatars/{user_id}/).
+        ולידציית אבטחה: staging_key חייב להכיל את user_id של המשתמש המחובר.
         """
-        # וולידציה: בודק שה-staging_key שייך למשתמש
-        if not staging_key.startswith(f"avatars/staging/{user.user_id}_"):
+        expected_prefix = f"avatars/staging/{user.user_id}_"
+        if not staging_key.startswith(expected_prefix):
             logger.warning(
-                "Invalid staging_key for user %s: %s (does not match user_id)",
+                "Invalid staging_key for user %s: %s (must start with %s)",
                 user.user_id,
                 staging_key,
+                expected_prefix,
             )
-            raise ValueError(f"Invalid staging_key for user {user.user_id}")
+            raise ValueError(
+                "staging_key does not belong to current user; possible abuse attempt"
+            )
 
-        # שמירת URL ישן לפני איפוס (למחיקה ב-worker)
-        old_avatar_url = user.avatar_url
-        await self.crud.update(db, db_obj=user, obj_in={"avatar_url": None})
+        # עדכון מיידי ב-DB (אופטימי — הפרונט יכול להציג תמונה מ-staging עד שה-worker יסיים)
+        await self.crud.update(db, db_obj=user, obj_in={"avatar_key": staging_key})
 
         await publish_to_outbox(
             db,
             event_name="user.avatar_upload",
-            payload={
-                "user_id": user.user_id,
-                "staging_key": staging_key,
-                "old_avatar_url": old_avatar_url,
-            },
+            payload={"user_id": str(user.user_id), "staging_key": staging_key},
         )
         await db.commit()
         logger.info(
@@ -128,43 +86,26 @@ class UserService:
             staging_key,
         )
 
-    async def remove_avatar(self, db: AsyncSession, user_id: int) -> None:
+    async def remove_avatar(self, db: AsyncSession, user_id) -> None:
         """
-        מסיר תמונת פרופיל: דוחף אירוע לתור לעיבוד ברקע (מחיקה מ-S3 + עדכון DB).
-        מחזיר 202 מיד - העיבוד מתבצע ברקע על ידי ה-worker.
+        מסיר תמונת פרופיל: מוחק את תיקיית avatars/{user_id}/ מ-S3 ומאפס avatar_key ב-DB.
+        אם אין תמונה – no-op.
         """
         user = await self.get_user_by_id(db, user_id=user_id)
 
-        # מאפס avatar_url ב-DB מיד (כדי שהמשתמש יראה שהתמונה נמחקה)
-        await self.crud.update(db, db_obj=user, obj_in={"avatar_url": None})
+        if not user.avatar_key or not str(user.avatar_key).strip():
+            await db.commit()
+            logger.info("Avatar already empty for user %s", user_id)
+            return
 
-        # דוחף אירוע לתור - ה-worker ימחק מ-S3 ברקע
-        await publish_to_outbox(
-            db,
-            event_name="user.avatar_remove",
-            payload={"user_id": user.user_id},
-        )
+        try:
+            await self.s3.delete_user_avatar_folder(user.user_id)
+        except Exception as e:
+            logger.warning("Could not delete avatar folder for user %s: %s", user_id, e)
+
+        await self.crud.update(db, db_obj=user, obj_in={"avatar_key": None})
         await db.commit()
-        logger.info("Avatar removal scheduled for user %s", user_id)
-
-    async def update_avatar(
-        self, db: AsyncSession, user: User, file: UploadFile
-    ) -> str:
-        old_avatar_url = user.avatar_url
-        new_avatar_url = await self.s3.upload_user_avatar(
-            file=file, user_id=user.user_id
-        )
-
-        user.avatar_url = new_avatar_url
-        db.add(user)
-        db.commit()
-        db.refresh(user)
-
-        if old_avatar_url:
-            await self.s3.delete_old_avatar(old_avatar_url)
-
-        logger.info(f"Avatar updated for user {user.user_id}")
-        return new_avatar_url
+        logger.info("Avatar removed for user %s", user_id)
 
     async def update_user_location(
         self, db: AsyncSession, user_id: int, lat: float, lon: float

@@ -8,8 +8,12 @@ import {
   type ConversationDetail,
   type MessageResponse,
 } from '../api/client';
+import { CHAT_WS_URL } from '../config/env';
 import { formatDateTimeNoSeconds } from '../utils/date';
 import styles from './MessageThread.module.css';
+
+const TYPING_THROTTLE_MS = 4000;
+const TYPING_DISPLAY_TIMEOUT_MS = 5000;
 
 export default function MessageThread() {
   const { conversationId } = useParams<{ conversationId: string }>();
@@ -20,7 +24,12 @@ export default function MessageThread() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState('');
   const [input, setInput] = useState('');
+  const [partnerTyping, setPartnerTyping] = useState(false);
+  const [partnerTypingName, setPartnerTypingName] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const lastTypingSentRef = useRef<number>(0);
+  const typingHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const cid = conversationId ?? '';
 
@@ -49,6 +58,76 @@ export default function MessageThread() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // WebSocket: connect when we have conversation id and token; handle incoming messages and typing.
+  useEffect(() => {
+    if (!cid) return;
+    const token = localStorage.getItem('linkup_access_token');
+    if (!token) return;
+
+    const url = `${CHAT_WS_URL.replace(/^http/, 'ws')}/ws?token=${encodeURIComponent(token)}`;
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(url.startsWith('ws') ? url : `ws://${url.replace(/^https?:\/\//, '')}`);
+    } catch {
+      return;
+    }
+    wsRef.current = ws;
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data as string) as Record<string, unknown>;
+        if (data?.type === 'typing_start') {
+          setPartnerTyping(true);
+          setPartnerTypingName((data.full_name as string) || null);
+          if (typingHideTimeoutRef.current) clearTimeout(typingHideTimeoutRef.current);
+          typingHideTimeoutRef.current = setTimeout(() => {
+            setPartnerTyping(false);
+            setPartnerTypingName(null);
+            typingHideTimeoutRef.current = null;
+          }, TYPING_DISPLAY_TIMEOUT_MS);
+          return;
+        }
+        if (typeof (data as MessageResponse).message_id === 'number') {
+          const msg = data as MessageResponse;
+          setMessages((prev) => [...prev, msg]);
+          if (msg.sender_id !== user?.user_id) setPartnerTyping(false);
+        }
+      } catch {
+        // ignore parse errors
+      }
+    };
+
+    return () => {
+      if (typingHideTimeoutRef.current) {
+        clearTimeout(typingHideTimeoutRef.current);
+        typingHideTimeoutRef.current = null;
+      }
+      ws.close();
+      wsRef.current = null;
+    };
+  }, [cid, user?.user_id]);
+
+  const sendTypingIfNeeded = useCallback(() => {
+    if (!conversation?.partner?.user_id || !cid || !user?.user_id) return;
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    const now = Date.now();
+    if (now - lastTypingSentRef.current < TYPING_THROTTLE_MS) return;
+    lastTypingSentRef.current = now;
+    try {
+      ws.send(
+        JSON.stringify({
+          type: 'typing_start',
+          conversation_id: cid,
+          recipient_id: conversation.partner.user_id,
+          full_name: user.full_name ?? undefined,
+        })
+      );
+    } catch {
+      // ignore
+    }
+  }, [cid, conversation?.partner?.user_id, user?.user_id, user?.full_name]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,6 +166,7 @@ export default function MessageThread() {
   }
 
   const partnerName = conversation?.partner?.full_name || (cid ? `שיחה` : '');
+  const partnerAvatarUrl = conversation?.partner?.avatar_url;
 
   return (
     <div className={styles.page} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -94,6 +174,29 @@ export default function MessageThread() {
         <Link to="/messages" className={`${styles.btn} ${styles.btnOutline}`} style={{ fontSize: '0.875rem' }}>
           ← הודעות
         </Link>
+        {partnerAvatarUrl ? (
+          <img
+            src={partnerAvatarUrl}
+            alt=""
+            style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }}
+          />
+        ) : (
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: '50%',
+              background: 'var(--surface, #e5e7eb)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '1rem',
+              fontWeight: 600,
+            }}
+          >
+            {(partnerName || '?').charAt(0)}
+          </div>
+        )}
         <h1 className={styles.pageTitle} style={{ margin: 0, flex: 1 }}>
           {partnerName}
         </h1>
@@ -146,13 +249,21 @@ export default function MessageThread() {
             );
           })
         )}
+        {partnerTyping && (
+          <p className={styles.emptyText} style={{ margin: 0, fontSize: '0.875rem', opacity: 0.8 }}>
+            {partnerTypingName ? `${partnerTypingName} מקליד...` : 'מקליד...'}
+          </p>
+        )}
         <div ref={messagesEndRef} />
       </div>
       <form onSubmit={handleSend} style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
         <input
           type="text"
           value={input}
-          onChange={(e) => setInput(e.target.value)}
+          onChange={(e) => {
+            setInput(e.target.value);
+            sendTypingIfNeeded();
+          }}
           placeholder="כתוב הודעה..."
           className={styles.formInput}
           style={{ flex: 1 }}

@@ -5,9 +5,11 @@ from pydantic import (
     EmailStr,
     ConfigDict,
     Field,
+    computed_field,
     field_validator,
     model_validator,
 )
+from app.core.config import settings
 
 from app.core.utils.validators import (
     normalize_email_for_auth,
@@ -145,16 +147,27 @@ class ChangePasswordRequest(BaseModel):
 # --- Response Schemas ---
 
 
+def _avatar_url_medium_from_key(avatar_key: Optional[str]) -> Optional[str]:
+    if not avatar_key or not settings.S3_BUCKET_NAME:
+        return None
+    return f"https://{settings.S3_BUCKET_NAME}.s3.{settings.AWS_REGION}.amazonaws.com/{avatar_key}400x400.webp"
+
+
 class UserOut(BaseModel):
     user_id: UUID
     full_name: str
     email: EmailStr
     phone_number: str
     is_verified: bool
-    avatar_url: Optional[str] = None
+    avatar_key: Optional[str] = None
 
-    # מאפשר ל-Pydantic לעבוד ישירות עם אובייקטים של ה-Database (ORM)
     model_config = ConfigDict(from_attributes=True)
+
+    @computed_field
+    @property
+    def avatar_url(self) -> Optional[str]:
+        """תאימות לאחור — מחזיר URL ל-400x400."""
+        return _avatar_url_medium_from_key(self.avatar_key)
 
 
 class Token(BaseModel):

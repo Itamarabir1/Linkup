@@ -2,21 +2,20 @@ package auth
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// Claims for access token (same structure as Python: sub = user_id).
+// Claims for access token (same structure as Python: sub = user_id, UUID string).
 type claims struct {
 	Sub string `json:"sub"`
 	jwt.RegisteredClaims
 }
 
-// ValidateToken parses the JWT and returns user_id (sub) as int. Same SECRET_KEY and algorithm as Python.
-func ValidateToken(tokenString, secretKey, alg string) (userID int, err error) {
+// ValidateToken parses the JWT and returns user_id (sub) as string. Supports UUID from Python backend.
+func ValidateToken(tokenString, secretKey, alg string) (userID string, err error) {
 	if secretKey == "" {
-		return 0, fmt.Errorf("SECRET_KEY is required")
+		return "", fmt.Errorf("SECRET_KEY is required")
 	}
 	token, err := jwt.ParseWithClaims(tokenString, &claims{}, func(t *jwt.Token) (interface{}, error) {
 		if t.Method.Alg() != alg {
@@ -25,15 +24,14 @@ func ValidateToken(tokenString, secretKey, alg string) (userID int, err error) {
 		return []byte(secretKey), nil
 	})
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 	c, ok := token.Claims.(*claims)
 	if !ok || !token.Valid {
-		return 0, fmt.Errorf("invalid token")
+		return "", fmt.Errorf("invalid token")
 	}
-	userID, err = strconv.Atoi(c.Sub)
-	if err != nil {
-		return 0, fmt.Errorf("invalid sub: %s", c.Sub)
+	if c.Sub == "" {
+		return "", fmt.Errorf("empty sub")
 	}
-	return userID, nil
+	return c.Sub, nil
 }

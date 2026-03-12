@@ -23,7 +23,7 @@ const (
 
 // Conn represents a WebSocket connection for a user.
 type Conn struct {
-	UserID int
+	UserID string
 	Conn   *websocket.Conn
 	Send   chan []byte
 }
@@ -67,7 +67,7 @@ func (c *Conn) RunWritePump() {
 		case <-ticker.C:
 			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-				log.Printf("websocket ping error for user %d: %v", c.UserID, err)
+				log.Printf("websocket ping error for user %s: %v", c.UserID, err)
 				return
 			}
 		}

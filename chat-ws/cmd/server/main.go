@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"syscall"
 
+	redisv9 "github.com/redis/go-redis/v9"
+
 	"linkup/chat-ws/internal/config"
 	"linkup/chat-ws/internal/hub"
 	"linkup/chat-ws/internal/redis"
@@ -22,11 +24,18 @@ func main() {
 		log.Fatal("SECRET_KEY (or JWT_SECRET) is required")
 	}
 
-	h := hub.NewHub()
+	opt, err := redisv9.ParseURL(cfg.RedisURL)
+	if err != nil {
+		log.Fatalf("redis parse URL: %v", err)
+	}
+	redisClient := redisv9.NewClient(opt)
+	defer redisClient.Close()
+
+	h := hub.NewHub(redisClient)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	go redis.RunSubscriber(ctx, cfg.RedisURL, h)
+	go redis.RunSubscriber(ctx, redisClient, h)
 
 	http.HandleFunc("/ws", h.HandleWS(cfg))
 	addr := ":" + strconv.Itoa(cfg.Port)

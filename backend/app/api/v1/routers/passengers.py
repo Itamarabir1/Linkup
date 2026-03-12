@@ -33,7 +33,7 @@ from app.domain.users.model import User
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/passengers", tags=["Passengers"])
+router = APIRouter(prefix="/passengers", tags=["Passenger"])
 passenger_rides_router = APIRouter(prefix="/rides", tags=["Passenger"])
 
 

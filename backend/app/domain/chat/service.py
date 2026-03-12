@@ -16,6 +16,7 @@ from app.domain.chat.schema import (
     MessageResponse,
 )
 from app.domain.users.crud import crud_user
+from app.domain.users.schema import _avatar_url_from_key
 from app.domain.bookings.model import Booking
 from app.domain.bookings.enum import BookingStatus
 from app.domain.rides.model import Ride
@@ -80,7 +81,7 @@ async def get_or_create_conversation(
     partner = ConversationPartner(
         user_id=other.user_id,
         full_name=other.full_name,
-        avatar_url=other.avatar_url,
+        avatar_url=_avatar_url_from_key(other.avatar_key, "150x150.webp"),
     )
     return ConversationDetail(
         conversation_id=conv.conversation_id,
@@ -131,7 +132,7 @@ async def get_or_create_conversation_by_booking(
     partner = ConversationPartner(
         user_id=other.user_id,
         full_name=other.full_name,
-        avatar_url=other.avatar_url,
+        avatar_url=_avatar_url_from_key(other.avatar_key, "150x150.webp"),
     )
     return ConversationDetail(
         conversation_id=conv.conversation_id,
@@ -147,7 +148,7 @@ def _partner_from_conversation(conv, current_user_id: UUID) -> ConversationPartn
     return ConversationPartner(
         user_id=user.user_id,
         full_name=user.full_name,
-        avatar_url=user.avatar_url,
+        avatar_url=_avatar_url_from_key(user.avatar_key, "150x150.webp"),
     )
 
 
@@ -164,7 +165,7 @@ async def list_my_conversations(
         partner = ConversationPartner(
             user_id=partner_user.user_id,
             full_name=partner_user.full_name,
-            avatar_url=partner_user.avatar_url,
+            avatar_url=_avatar_url_from_key(partner_user.avatar_key, "150x150.webp"),
         )
         last = await chat_crud.get_last_message(db, conv.conversation_id)
         out.append(

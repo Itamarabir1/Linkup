@@ -8,10 +8,14 @@ import styles from './Layout.module.css';
 
 export default function Layout() {
   const { user } = useAuth();
-  const { activeGroup, setActiveGroup, myGroups, isLoadingGroups } = useGroup();
+  const { activeGroup, setActiveGroup, myGroups, isLoadingGroups, refreshGroups } = useGroup();
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
   const [groupDropdownOpen, setGroupDropdownOpen] = useState(false);
   const groupDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (groupDropdownOpen) refreshGroups();
+  }, [groupDropdownOpen, refreshGroups]);
 
   useEffect(() => {
     if (!user?.user_id) {
@@ -49,7 +53,7 @@ export default function Layout() {
   return (
     <div className={styles.layout}>
       <nav className={styles.nav}>
-        <div className={styles.navStart}>
+        <div className={styles.navEnd}>
           <div className={styles.groupDropdown} ref={groupDropdownRef}>
             <button
               type="button"
@@ -58,17 +62,10 @@ export default function Layout() {
               aria-expanded={groupDropdownOpen}
               aria-haspopup="true"
             >
-              {activeGroup ? (
-                <>
-                  <span className={styles.groupIcon}>👥</span>
-                  <span className={styles.groupName}>{activeGroup.name}</span>
-                </>
-              ) : (
-                <>
-                  <span className={styles.groupIcon}>🌐</span>
-                  <span className={styles.groupName}>ציבורי</span>
-                </>
-              )}
+              <span className={styles.groupIcon}>{activeGroup ? '👥' : '🌐'}</span>
+              <span className={styles.groupName}>
+                קבוצות · {activeGroup ? activeGroup.name : 'ציבורי'}
+              </span>
             </button>
             {groupDropdownOpen && (
               <div className={styles.groupDropdownPanel}>
@@ -108,8 +105,6 @@ export default function Layout() {
               </div>
             )}
           </div>
-        </div>
-        <div className={styles.navEnd}>
         <NavLink to="/my-rides" className={({ isActive }) => (isActive ? `${styles.navLink} ${styles.navLinkActive}` : styles.navLink)}>
           הנסיעות שלי
         </NavLink>
@@ -119,29 +114,33 @@ export default function Layout() {
         <NavLink to="/my-bookings" className={({ isActive }) => (isActive ? `${styles.navLink} ${styles.navLinkActive}` : styles.navLink)}>
           הזמנות שלי
         </NavLink>
-        <NavLink
-          to="/notifications"
-          className={({ isActive }) =>
-            `${styles.navLink} ${isActive ? styles.navLinkActive : ''} ${unreadNotificationsCount > 0 ? styles.navLinkHasNotifications : ''} ${isActive && unreadNotificationsCount > 0 ? styles.navLinkHasNotificationsActive : ''}`
-          }
-          style={{ position: 'relative' }}
-        >
-          התראות
-          {unreadNotificationsCount > 0 && (
-            <span className={styles.navNotificationBadge}>{unreadNotificationsCount}</span>
-          )}
-        </NavLink>
-        <NavLink to="/messages" className={({ isActive }) => (isActive ? `${styles.navLink} ${styles.navLinkActive}` : styles.navLink)}>
-          הודעות
-        </NavLink>
-        <NavLink to="/profile" className={({ isActive }) => (isActive ? `${styles.navLink} ${styles.navLinkActive}` : styles.navLink)}>
-          פרופיל
-        </NavLink>
         </div>
       </nav>
-      <main className={styles.main}>
-        <Outlet />
-      </main>
+      <div className={styles.layoutBody}>
+        <main className={styles.main}>
+          <Outlet />
+        </main>
+        <aside className={styles.sidebar}>
+          <NavLink
+            to="/notifications"
+            className={({ isActive }) =>
+              `${styles.sidebarLink} ${isActive ? styles.navLinkActive : ''} ${unreadNotificationsCount > 0 ? styles.navLinkHasNotifications : ''} ${isActive && unreadNotificationsCount > 0 ? styles.navLinkHasNotificationsActive : ''}`
+            }
+            style={{ position: 'relative' }}
+          >
+            התראות
+            {unreadNotificationsCount > 0 && (
+              <span className={styles.navNotificationBadge}>{unreadNotificationsCount}</span>
+            )}
+          </NavLink>
+          <NavLink to="/messages" className={({ isActive }) => (isActive ? `${styles.sidebarLink} ${styles.navLinkActive}` : styles.sidebarLink)}>
+            הודעות
+          </NavLink>
+          <NavLink to="/profile" className={({ isActive }) => (isActive ? `${styles.sidebarLink} ${styles.navLinkActive}` : styles.sidebarLink)}>
+            פרופיל
+          </NavLink>
+        </aside>
+      </div>
     </div>
   );
 }

@@ -28,8 +28,8 @@ class User(Base):
     is_active = Column(Boolean, default=True, server_default="true")
     is_admin = Column(Boolean, default=False, server_default="false")
 
-    # פרופיל (נהוג לשמור קישור מלא ל-S3, למשל https://bucket.s3.region.amazonaws.com/avatars/...)
-    avatar_url = Column(String(255), nullable=True)
+    # פרופיל — מפתח S3 בלבד (prefix תיקייה), למשל avatars/{user_id}/. URLs מלאים נבנים ב-runtime.
+    avatar_key = Column(String(255), nullable=True)
     fcm_token = Column(Text, nullable=True)
     # Refresh Token (ארוך תוקף) – נשמר ב-DB כדי לאפשר ביטול (logout מכל המכשירים)
     refresh_token = Column(Text, nullable=True)

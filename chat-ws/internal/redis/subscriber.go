@@ -2,25 +2,22 @@ package redis
 
 import (
 	"context"
-	"log"
+	"strings"
 
 	"github.com/redis/go-redis/v9"
 
 	"linkup/chat-ws/internal/hub"
 )
 
-const ChatChannelPattern = "chat:conversation:*"
+const (
+	ChatChannelPattern   = "chat:conversation:*"
+	TypingChannelPattern = "chat:typing:*"
+)
 
-// RunSubscriber subscribes to chat:conversation:* and forwards messages to the Hub.
-func RunSubscriber(ctx context.Context, redisURL string, h *hub.Hub) {
-	opt, err := redis.ParseURL(redisURL)
-	if err != nil {
-		log.Printf("redis parse URL: %v", err)
-		return
-	}
-	client := redis.NewClient(opt)
-	defer client.Close()
-	pubsub := client.PSubscribe(ctx, ChatChannelPattern)
+// RunSubscriber subscribes to chat:conversation:* and chat:typing:* and forwards messages to the Hub.
+// Caller owns the client; RunSubscriber does not close it.
+func RunSubscriber(ctx context.Context, client *redis.Client, h *hub.Hub) {
+	pubsub := client.PSubscribe(ctx, ChatChannelPattern, TypingChannelPattern)
 	defer pubsub.Close()
 	ch := pubsub.Channel()
 	for {
@@ -31,7 +28,12 @@ func RunSubscriber(ctx context.Context, redisURL string, h *hub.Hub) {
 			if !ok {
 				return
 			}
-			h.PublishChatMessage([]byte(msg.Payload))
+			payload := []byte(msg.Payload)
+			if strings.HasPrefix(msg.Channel, "chat:typing:") {
+				h.PublishTypingMessage(payload)
+			} else {
+				h.PublishChatMessage(payload)
+			}
 		}
 	}
 }

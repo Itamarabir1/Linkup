@@ -7,9 +7,10 @@ import logging
 from typing import Dict, Any
 from uuid import UUID
 
-from app.core.utils.validators import slugify_for_avatar
 from app.db.session import SessionLocal
 from app.domain.users.crud import crud_user
+from app.infrastructure.s3.client import s3_client
+from app.infrastructure.s3.image_processor import process_and_save_avatar
 from app.infrastructure.s3.service import storage_service
 
 logger = logging.getLogger(__name__)
@@ -21,7 +22,7 @@ AVATAR_REMOVE_EVENT = "user.avatar_remove"
 async def handle_avatar_upload_event(data: Dict[str, Any], routing_key: str) -> None:
     """
     מעבד אירועי אווטאר: העלאה או מחיקה.
-    - user.avatar_upload: finalize ב-S3 + עדכון avatar_url במסד.
+    - user.avatar_upload: עיבוד תמונה (resize ל-3 גדלים) + עדכון avatar_key במסד.
     - user.avatar_remove: מחיקה מ-S3 (DB כבר עודכן ב-API).
     """
     if routing_key == AVATAR_UPLOAD_EVENT:
@@ -34,9 +35,8 @@ async def handle_avatar_upload_event(data: Dict[str, Any], routing_key: str) -> 
 
 async def _handle_avatar_upload(data: Dict[str, Any]) -> None:
     """
-    מעבד אירוע העלאת אווטאר: finalize ב-S3 (שם קובץ = slug משם המשתמש) + עדכון avatar_url במסד.
-    payload: { "user_id": int, "staging_key": str }
-    הערה: המחיקה של התמונה הישנה כבר בוצעה ב-API (לפי URL, מהיר), אז כאן רק finalize + DB update.
+    מעבד אירוע העלאת אווטאר: הורדה מ-staging, resize ל-3 גדלים, העלאה ל-avatars/{user_id}/, עדכון avatar_key.
+    payload: { "user_id": str/uuid, "staging_key": str }
     """
     user_id = data.get("user_id")
     staging_key = data.get("staging_key")
@@ -49,6 +49,7 @@ async def _handle_avatar_upload(data: Dict[str, Any]) -> None:
         raise ValueError("user_id and staging_key required")
 
     user_id = UUID(str(user_id))
+    uid_str = str(user_id)
 
     async with SessionLocal() as db:
         try:
@@ -57,36 +58,18 @@ async def _handle_avatar_upload(data: Dict[str, Any]) -> None:
                 logger.error("User not found for avatar finalize: user_id=%s", user_id)
                 raise ValueError(f"User not found: {user_id}")
 
-            # מחיקת תמונה ישנה אם קיימת (לפני finalize)
-            old_avatar_url = data.get("old_avatar_url")
-            if old_avatar_url:
-                try:
-                    await storage_service.delete_old_avatar(old_avatar_url)
-                    logger.info(
-                        "Deleted old avatar before finalize: %s", old_avatar_url[:80]
-                    )
-                except Exception as e:
-                    logger.warning(
-                        "Could not delete old avatar URL %s: %s", old_avatar_url[:80], e
-                    )
-
-            # גם מוחקים לפי user_id (למקרה של שינוי שם)
-            try:
-                await storage_service.delete_avatar_by_user_id(user_id)
-            except Exception as e:
-                logger.warning("Could not delete avatar by user_id %s: %s", user_id, e)
-
-            # Finalize: העברה מ-staging ל-final + עדכון DB
-            base_name = slugify_for_avatar(user.full_name) or None
-            final_url = await storage_service.finalize_avatar(
-                staging_key=staging_key, user_id=user_id, base_name=base_name
+            avatar_key = await process_and_save_avatar(
+                staging_key=staging_key,
+                user_id=uid_str,
+                s3_client=s3_client,
+                storage_service=storage_service,
             )
-            user.avatar_url = final_url
+            user.avatar_key = avatar_key
             db.add(user)
 
             await db.commit()
             await db.refresh(user)
-            logger.info("Avatar finalized for user %s: %s", user_id, final_url)
+            logger.info("Avatar processed for user %s: avatar_key=%s", user_id, avatar_key)
 
         except Exception:
             await db.rollback()
@@ -96,9 +79,9 @@ async def _handle_avatar_upload(data: Dict[str, Any]) -> None:
 
 async def _handle_avatar_remove(data: Dict[str, Any]) -> None:
     """
-    מעבד אירוע מחיקת אווטאר: מוחק מ-S3 לפי user_id.
-    payload: { "user_id": int }
-    הערה: avatar_url כבר אופס ב-DB ב-API, אז אנחנו רק מוחקים מ-S3.
+    מעבד אירוע מחיקת אווטאר: מוחק מ-S3 את avatars/{user_id}/.
+    payload: { "user_id": str/uuid }
+    הערה: avatar_key כבר אופס ב-DB ב-API.
     """
     user_id = data.get("user_id")
     if user_id is None:
@@ -109,14 +92,12 @@ async def _handle_avatar_remove(data: Dict[str, Any]) -> None:
 
     async with SessionLocal() as db:
         try:
-            # בודק שהמשתמש קיים (ולידציה)
             user = await crud_user.get_by_id(db, id=user_id)
             if not user:
                 logger.error("User not found for avatar removal: user_id=%s", user_id)
                 raise ValueError(f"User not found: {user_id}")
 
-            # מוחק מ-S3 (DB כבר עודכן ב-API)
-            await storage_service.delete_avatar_by_user_id(user_id)
+            await storage_service.delete_user_avatar_folder(user_id)
 
             logger.info("Avatar removed from S3 for user %s", user_id)
 

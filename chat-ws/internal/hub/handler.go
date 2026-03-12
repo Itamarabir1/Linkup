@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -10,6 +11,14 @@ import (
 	"linkup/chat-ws/internal/auth"
 	"linkup/chat-ws/internal/config"
 )
+
+// clientIncoming is the shape of JSON sent by the client (e.g. typing_start).
+type clientIncoming struct {
+	Type           string `json:"type"`
+	ConversationID string `json:"conversation_id"`
+	RecipientID    string `json:"recipient_id"`
+	FullName       string `json:"full_name,omitempty"`
+}
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -44,10 +53,26 @@ func (h *Hub) HandleWS(cfg config.Config) http.HandlerFunc {
 			close(c.Send)
 		}()
 		go c.RunWritePump()
-		// Block until client closes.
+		// Read client messages: typing_start -> publish to Redis; other types ignored for now.
 		for {
-			if _, _, err := conn.ReadMessage(); err != nil {
+			_, raw, err := conn.ReadMessage()
+			if err != nil {
 				return
+			}
+			var in clientIncoming
+			if err := json.Unmarshal(raw, &in); err != nil {
+				continue // ignore malformed
+			}
+			if in.Type == "typing_start" && in.ConversationID != "" && in.RecipientID != "" {
+				payload := TypingPayload{
+					Type:            "typing_start",
+					UserID:          userID,
+					ConversationID:  in.ConversationID,
+					RecipientID:     in.RecipientID,
+					FullName:        in.FullName,
+				}
+				body, _ := json.Marshal(payload)
+				h.PublishTyping(context.Background(), in.ConversationID, body)
 			}
 		}
 	}

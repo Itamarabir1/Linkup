@@ -1,7 +1,8 @@
-from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator
+from pydantic import BaseModel, EmailStr, Field, ConfigDict, field_validator, computed_field
 from typing import Optional
 from uuid import UUID
 
+from app.core.config import settings
 from app.core.utils.validators import (
     normalize_email_for_auth,
     validate_password_strength,
@@ -54,15 +55,37 @@ class UserBaseSchema(BaseModel):
 
 
 # --- קריאה (Response) ---
+def _avatar_url_from_key(avatar_key: Optional[str], filename: str) -> Optional[str]:
+    """בונה URL מלא ל-S3. אם avatar_key הוא staging (avatars/staging/...) — מחזיר את ה-key כקובץ יחיד."""
+    if not avatar_key or not settings.S3_BUCKET_NAME:
+        return None
+    base = f"https://{settings.S3_BUCKET_NAME}.s3.{settings.AWS_REGION}.amazonaws.com/"
+    if avatar_key.startswith("avatars/staging/"):
+        return f"{base}{avatar_key}"
+    return f"{base}{avatar_key}{filename}"
+
+
 class UserRead(BaseModel):
     user_id: UUID
     full_name: str
     phone_number: str
     email: Optional[EmailStr] = None
-    avatar_url: Optional[str] = None
+    avatar_key: Optional[str] = None
     is_verified: bool = False
 
     model_config = ConfigDict(from_attributes=True)
+
+    @computed_field
+    @property
+    def avatar_url_small(self) -> Optional[str]:
+        """150x150 — רשימות צ'אט, אווטארים קטנים."""
+        return _avatar_url_from_key(self.avatar_key, "150x150.webp")
+
+    @computed_field
+    @property
+    def avatar_url_medium(self) -> Optional[str]:
+        """400x400 — תמונת פרופיל ראשית."""
+        return _avatar_url_from_key(self.avatar_key, "400x400.webp")
 
 
 # app/domain/users/schema.py
@@ -84,7 +107,6 @@ class UserCreate(BaseModel):
 class UserUpdate(UserBaseSchema):
     full_name: Optional[str] = Field(None, min_length=2, max_length=100)
     email: Optional[EmailStr] = None
-    avatar_url: Optional[str] = None
 
 
 # --- מיקום ו-FCM ---
@@ -106,9 +128,10 @@ class MessageResponse(BaseModel):
 
 
 class UserAvatarResponse(BaseModel):
-    """תגובה לאחר העלאת אווטאר (סינכרוני) – מחזיר את ה-URL."""
+    """תגובה לאחר העלאת אווטאר – מחזיר מפתח או URL לפי צורך."""
 
-    avatar_url: str
+    avatar_key: Optional[str] = None
+    avatar_url_medium: Optional[str] = None
 
 
 class AvatarUploadAcceptedResponse(BaseModel):

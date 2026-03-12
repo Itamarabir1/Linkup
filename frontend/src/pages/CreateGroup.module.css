@@ -60,6 +60,15 @@
   cursor: not-allowed;
 }
 
+.btnPrimaryCopied {
+  background: #1d4ed8;
+  color: #fff;
+}
+
+.btnPrimaryCopied:hover {
+  background: #1d4ed8;
+}
+
 .successSection {
   margin-top: 1.5rem;
   padding: 1rem 1.25rem;
@@ -95,10 +104,4 @@
 .copiedToast {
   font-size: 0.9rem;
   color: #059669;
-}
-
-.redirectNote {
-  font-size: 0.9rem;
-  color: #6b7280;
-  margin-top: 1rem;
 }

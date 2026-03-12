@@ -1,6 +1,9 @@
 """
-לקוח S3 (aioboto3) – העלאה, העתקה ומחיקה.
-משמש את StorageService להעלאת אווטאר (staging → finalize).
+לקוח S3 (aioboto3) – העלאה, הורדה, העתקה ומחיקה.
+משמש את StorageService והעיבוד ברקע (presigned upload → worker מעבד ל-avatars/{user_id}/).
+
+הערה: כשהפרונט מעלה ישירות ל-S3 עם presigned URL, ה-bucket חייב להגדיר CORS שמאפשר
+PUT מ-origin של הפרונט (למשל http://localhost:5173 בפיתוח). ראה docs/S3_CORS.md.
 """
 
 import logging
@@ -73,6 +76,17 @@ class S3Client:
                 exc_info=True,
             )
             raise
+
+    async def get_object_bytes(self, key: str) -> bytes:
+        """מוריד אובייקט כ-bytes (לעיבוד תמונה ב-worker)."""
+        try:
+            async with self._session.client("s3") as s3:
+                resp = await s3.get_object(Bucket=self.bucket_name, Key=key)
+                body = await resp["Body"].read()
+                return body
+        except Exception as e:
+            logger.error("S3 get_object failed key=%s: %s", key, e, exc_info=True)
+            raise StorageServiceError(payload={"detail": str(e)}) from e
 
     async def list_objects_by_prefix(self, prefix: str) -> list[str]:
         """מחזיר רשימת keys עם prefix נתון."""

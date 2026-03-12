@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
+import { compressImage } from '../utils/imageUtils';
 import styles from './Profile.module.css';
 
 const ACCEPT_AVATAR = 'image/jpeg,image/png,image/webp';
@@ -9,9 +10,12 @@ const MAX_SIZE_MB = 5;
 export default function Profile() {
   const { user, logout, refreshUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const prevAvatarUrlRef = useRef<string | null | undefined>(null);
+  const avatarCacheBusterRef = useRef<number>(0);
   const [uploading, setUploading] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [error, setError] = useState('');
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarExpanded, setAvatarExpanded] = useState(false);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
 
@@ -31,46 +35,34 @@ export default function Profile() {
     setError('');
     setAvatarLoadError(false);
     setUploading(true);
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+    setAvatarPreview(URL.createObjectURL(file));
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      await api.post('/users/me/avatar', formData);
-      
-      // Polling עד שהתמונה מוכנה (ה-worker מעדכן את avatar_url)
-      // מנסים עד 6 פעמים עם הפסקות של 0.8 שניות (סה"כ עד ~5 שניות)
-      let attempts = 0;
-      const maxAttempts = 6;
-      const pollInterval = 800;
-      
-      const pollForAvatar = async (): Promise<void> => {
-        await refreshUser();
-        attempts++;
-        
-        // בודקים אם יש avatar_url חדש (משתמש ב-state המעודכן)
-        // נשתמש ב-useEffect כדי לבדוק את השינוי
-        if (attempts >= maxAttempts) {
-          setUploading(false);
-          // לא מציגים שגיאה - התמונה כנראה תגיע בקרוב
-          return;
-        }
-        
-        // ממשיך לנסות
-        setTimeout(pollForAvatar, pollInterval);
-      };
-      
-      // מתחיל polling מיד ואז כל 0.8 שניות
-      await refreshUser(); // רענון ראשון מיד
-      setTimeout(pollForAvatar, pollInterval);
+      const compressed = await compressImage(file, { maxWidth: 800, quality: 0.85 });
+      const { data: uploadData } = await api.get<{ upload_url: string; staging_key: string }>(
+        '/users/me/avatar/upload-url'
+      );
+      await fetch(uploadData.upload_url, {
+        method: 'PUT',
+        body: compressed,
+        headers: { 'Content-Type': 'image/webp' },
+      });
+      await api.post('/users/me/avatar/confirm', { staging_key: uploadData.staging_key });
+      await refreshUser();
+      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+      setAvatarPreview(null);
     } catch (err: unknown) {
       const res = (err as { response?: { data?: Record<string, unknown> } })?.response;
       const data = res?.data ?? {};
       const raw = (data.message ?? data.detail) as string | undefined;
       setError(typeof raw === 'string' ? raw : (err as Error)?.message ?? 'העלאת תמונה נכשלה');
+    } finally {
       setUploading(false);
     }
   };
 
   const handleRemoveAvatar = async () => {
+    if (!user?.avatar_key && !(user as { avatar_url?: string })?.avatar_url) return;
     setError('');
     setRemoving(true);
     setAvatarLoadError(false);
@@ -92,18 +84,23 @@ export default function Profile() {
     setAvatarLoadError(true);
   };
 
-  // אם יש avatar_url אבל התמונה לא נטענה, מתייחסים כאילו אין avatar_url
-  const hasValidAvatar = user?.avatar_url && !avatarLoadError;
-  const avatarSrc = user?.avatar_url ? encodeURI(user.avatar_url) : '';
+  const profileAvatarUrl = (user as { avatar_url_medium?: string; avatar_url?: string })?.avatar_url_medium
+    ?? (user as { avatar_url?: string })?.avatar_url;
+  const hasValidAvatar = (profileAvatarUrl || avatarPreview) && !avatarLoadError;
+  const avatarSrc = avatarPreview
+    ? avatarPreview
+    : profileAvatarUrl
+      ? `${encodeURI(profileAvatarUrl)}${profileAvatarUrl.includes('?') ? '&' : '?'}_v=${avatarCacheBusterRef.current}`
+      : '';
 
-  // איפוס שגיאת טעינת תמונה כשהמשתמש או avatar_url משתנים
   useEffect(() => {
-    setAvatarLoadError(false);
-    // אם יש avatar_url חדש אחרי העלאה, מסיים את מצב ההעלאה
-    if (user?.avatar_url && uploading) {
-      setUploading(false);
+    const currentUrl = profileAvatarUrl ?? null;
+    if (prevAvatarUrlRef.current !== currentUrl) {
+      prevAvatarUrlRef.current = currentUrl;
+      avatarCacheBusterRef.current = Date.now();
+      setAvatarLoadError(false);
     }
-  }, [user?.avatar_url, uploading]);
+  }, [profileAvatarUrl]);
 
   return (
     <div className={styles.page}>
@@ -193,7 +190,7 @@ export default function Profile() {
         </div>
       )}
 
-      {avatarExpanded && hasValidAvatar && user?.avatar_url && (
+      {avatarExpanded && hasValidAvatar && avatarSrc && (
         <div
           className={styles.avatarModalBackdrop}
           onClick={() => setAvatarExpanded(false)}

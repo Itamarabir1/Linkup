@@ -8,4 +8,9 @@ const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 // timeout לבקשות API (מילישניות). ברירת מחדל 30 שניות – מונע timeout בהתחלה איטית של השרת
 const API_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS) || 30000;
 
-export { API_BASE_URL, GOOGLE_MAPS_API_KEY, API_TIMEOUT_MS };
+// WebSocket URL for real-time chat and typing (chat-ws). In dev often ws://localhost:8081
+const CHAT_WS_URL =
+  import.meta.env.VITE_CHAT_WS_URL ||
+  (import.meta.env.DEV ? 'ws://localhost:8081' : 'ws://127.0.0.1:8081');
+
+export { API_BASE_URL, GOOGLE_MAPS_API_KEY, API_TIMEOUT_MS, CHAT_WS_URL };
