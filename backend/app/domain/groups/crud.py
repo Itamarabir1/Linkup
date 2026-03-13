@@ -62,9 +62,22 @@ async def join_group(db: AsyncSession, group_id: UUID, user_id: UUID) -> GroupMe
 
 async def remove_member(db: AsyncSession, group_id: UUID, user_id: UUID) -> None:
     member = await get_membership(db, group_id, user_id)
-    if member:
-        db.delete(member)
-        await db.commit()
+    if not member:
+        return
+    group = await get_group_by_id(db, group_id)
+    if group and group.admin_id == user_id:
+        # מנהל יוצא — העבר מנהלות לחבר אחר אם יש
+        members = await get_group_members(db, group_id)
+        others = [m for m in members if m.user_id != user_id]
+        if others:
+            # ממיין לפי joined_at, לוקח את הראשון
+            others.sort(key=lambda m: m.joined_at)
+            new_admin = others[0]
+            group.admin_id = new_admin.user_id
+            new_admin.role = "admin"
+            await db.commit()
+    db.delete(member)
+    await db.commit()
 
 
 async def update_member_role(db: AsyncSession, group_id: UUID, user_id: UUID, role: str) -> Optional[GroupMember]:
@@ -78,6 +91,22 @@ async def update_member_role(db: AsyncSession, group_id: UUID, user_id: UUID, ro
 
 async def rename_group(db: AsyncSession, group: Group, name: str) -> Group:
     group.name = name
+    await db.commit()
+    await db.refresh(group)
+    return group
+
+
+async def update_group_description(db: AsyncSession, group: Group, description: Optional[str]) -> Group:
+    if description is not None and len(description) > 500:
+        description = description[:500]
+    group.description = description
+    await db.commit()
+    await db.refresh(group)
+    return group
+
+
+async def update_group_avatar_key(db: AsyncSession, group: Group, avatar_key: Optional[str]) -> Group:
+    group.avatar_key = avatar_key
     await db.commit()
     await db.refresh(group)
     return group

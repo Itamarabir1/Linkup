@@ -15,6 +15,7 @@ import Messages from './pages/Messages';
 import MessageThread from './pages/MessageThread';
 import Profile from './pages/Profile';
 import CreateGroup from './pages/CreateGroup';
+import Groups from './pages/Groups';
 import GroupManage from './pages/GroupManage';
 import JoinGroup from './pages/JoinGroup';
 
@@ -53,6 +54,7 @@ function AppRoutes() {
         <Route path="messages" element={<Messages />} />
         <Route path="messages/:conversationId" element={<MessageThread />} />
         <Route path="profile" element={<Profile />} />
+        <Route path="groups" element={<Groups />} />
         <Route path="groups/new" element={<CreateGroup />} />
         <Route path="groups/:groupId" element={<GroupManage />} />
         <Route path="join/:inviteCode" element={<JoinGroup />} />

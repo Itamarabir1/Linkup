@@ -117,6 +117,9 @@ export interface Group {
   invite_expires_at?: string | null;
   created_at: string;
   member_count?: number;
+  avatar_key?: string | null;
+  avatar_url?: string | null;
+  description?: string | null;
 }
 
 export interface GroupMember {

@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { Car, Plus } from 'lucide-react';
 import { api } from '../api/client';
 import type { Ride } from '../types/api';
-import { formatDateTimeNoSeconds } from '../utils/date';
+import { formatRideDate } from '../utils/date';
 import { API_BASE_URL } from '../config/env';
 import { useAuth } from '../context/AuthContext';
+import { useGroup } from '../context/GroupContext';
+import Chips, { type ChipItem } from '../components/Chips/Chips';
+import RideCard from '../components/RideCard/RideCard';
+import ConfirmModal from '../components/ConfirmModal/ConfirmModal';
 import styles from './MyRides.module.css';
 
 function getRideWsUrl(rideId: string): string {
@@ -16,14 +21,43 @@ function getRideWsUrl(rideId: string): string {
   return `${base}/rides/ws/${rideId}`;
 }
 
+function getStatusLabel(r: Ride): string {
+  if (r.status === 'cancelled') return 'בוטלה';
+  const seats = r.available_seats ?? 0;
+  if (seats <= 0) return 'מלא';
+  if (seats === 1) return '1 מקום';
+  return `${seats} מקומות`;
+}
+
 export default function MyRides() {
+  const navigate = useNavigate();
   const { user } = useAuth();
+  const { myGroups } = useGroup();
   const [rides, setRides] = useState<Ride[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [activeChip, setActiveChip] = useState<string>('all');
   const [rideToCancel, setRideToCancel] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const wsRefs = useRef<Map<string, WebSocket>>(new Map());
+
+  const chipItems: ChipItem[] = [
+    { id: 'all', label: 'הכל' },
+    { id: 'public', label: 'ציבורי' },
+    ...myGroups.map((g) => ({ id: g.group_id, label: g.name })),
+  ];
+
+  const displayedRides = rides.filter((r) => {
+    if (activeChip === 'all') return true;
+    if (activeChip === 'public') return !r.group_id;
+    return r.group_id === activeChip;
+  });
+
+  const getSource = (r: Ride): string => {
+    if (!r.group_id) return 'ציבורי';
+    const g = myGroups.find((x) => x.group_id === r.group_id);
+    return g?.name ?? 'ציבורי';
+  };
 
   const fetchRides = useCallback(async () => {
     try {
@@ -47,17 +81,14 @@ export default function MyRides() {
     fetchRides();
   }, [fetchRides]);
 
-  // WebSocket: חיבור לערוץ של כל נסיעה כדי לקבל RIDE_CANCELLED. סוגרים רק נסיעות שיצאו מהרשימה (לא את כולם) כדי לא לסגור חיבורים לפני שהתבססו.
   useEffect(() => {
     const rideIds = rides.map((r) => r.ride_id);
     const currentIds = new Set(rideIds);
-
     rideIds.forEach((rideId) => {
       if (wsRefs.current.has(rideId)) return;
       const url = getRideWsUrl(rideId);
-      let ws: WebSocket;
       try {
-        ws = new WebSocket(url);
+        const ws = new WebSocket(url);
         wsRefs.current.set(rideId, ws);
         ws.onmessage = (ev) => {
           try {
@@ -66,30 +97,22 @@ export default function MyRides() {
               setRides((prev) => prev.filter((r) => r.ride_id !== rideId));
             }
           } catch {
-            // לא JSON או פורמט אחר – מתעלמים
+            // ignore
           }
         };
-        ws.onclose = () => {
-          wsRefs.current.delete(rideId);
-        };
+        ws.onclose = () => wsRefs.current.delete(rideId);
       } catch {
         wsRefs.current.delete(rideId);
       }
     });
-
     wsRefs.current.forEach((sock, id) => {
       if (!currentIds.has(id)) {
         sock.close();
         wsRefs.current.delete(id);
       }
     });
-
-    return () => {
-      // סגירת כל החיבורים רק ב-unmount של הקומפוננטה (לא בכל שינוי rides)
-    };
   }, [rides]);
 
-  // ב-unmount: סגירת כל ה-WebSockets
   useEffect(() => {
     return () => {
       wsRefs.current.forEach((sock) => sock.close());
@@ -126,87 +149,64 @@ export default function MyRides() {
 
   return (
     <div className={styles.page}>
-      <header className={styles.pageHeader}>
-        <h1 className={styles.pageTitle}>הנסיעות שלי</h1>
-        <Link to="/create-ride" className={`${styles.btn} ${styles.btnPrimary}`}>
-          + נסיעה חדשה
-        </Link>
-      </header>
+      <Chips
+        items={chipItems}
+        activeId={activeChip}
+        onChange={setActiveChip}
+      />
       {error && <p className={styles.pageError}>{error}</p>}
-      <div className={styles.cardList}>
-        {rides.length === 0 ? (
-          <p className={styles.emptyText}>אין נסיעות. צור נסיעה חדשה.</p>
-        ) : (
-          rides.map((r) => (
-            <div key={r.ride_id} className={`${styles.card} ${styles.cardRideWrap}`}>
+
+      {rides.length === 0 ? (
+        <div className={styles.emptyState}>
+          <Car size={48} strokeWidth={1.5} className={styles.emptyIcon} />
+          <h2 className={styles.emptyTitle}>אין נסיעות עדיין</h2>
+          <p className={styles.emptySubtitle}>צור את הנסיעה הראשונה שלך</p>
+          <button
+            type="button"
+            className={styles.btnPrimary}
+            onClick={() => navigate('/create-ride')}
+          >
+            <Plus size={14} />
+            הצע נסיעה
+          </button>
+        </div>
+      ) : (
+        <div className={styles.grid}>
+          {displayedRides.map((r) => (
+            <div key={r.ride_id} className={styles.cardWrap}>
               <button
                 type="button"
-                className={styles.cardRideDeleteBtn}
-                onClick={() => setRideToCancel(r.ride_id)}
+                className={styles.cardDeleteBtn}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setRideToCancel(r.ride_id);
+                }}
                 title="מחק נסיעה"
                 aria-label="מחק נסיעה"
               >
                 ×
               </button>
-              <div className={styles.cardRoute}>
-                {r.origin_name ?? '?'} → {r.destination_name ?? '?'}
-              </div>
-              <div className={styles.cardMeta}>
-                {formatDateTimeNoSeconds(r.departure_time)} ·{' '}
-                {r.available_seats} מושבים · {r.status}
-              </div>
-              {r.route_summary && (
-                <div className={`${styles.cardMeta} ${styles.cardRouteSummary}`}>
-                  כביש מרכזי: {r.route_summary}
-                </div>
-              )}
+              <RideCard
+                route={`${r.destination_name ?? '?'} ← ${r.origin_name ?? '?'}`}
+                time={formatRideDate(r.departure_time)}
+                status={getStatusLabel(r)}
+                source={getSource(r)}
+              />
             </div>
-          ))
-        )}
-      </div>
-
-      {rideToCancel != null && (
-        <div
-          className={styles.confirmModalBackdrop}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="confirm-delete-title"
-          onClick={() => setRideToCancel(null)}
-        >
-          <div
-            className={styles.confirmModalBox}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="confirm-delete-title" className={styles.confirmModalTitle}>
-              האם אני בטוח שאני רוצה למחוק את המסלול?
-            </h2>
-            <div className={styles.confirmModalActions}>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnOutline}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setRideToCancel(null);
-                }}
-                disabled={cancelling}
-              >
-                ביטול
-              </button>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnDanger}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleConfirmCancel();
-                }}
-                disabled={cancelling}
-              >
-                {cancelling ? 'מבטל...' : 'אישור'}
-              </button>
-            </div>
-          </div>
+          ))}
         </div>
       )}
+
+      <ConfirmModal
+        open={rideToCancel != null}
+        onClose={() => setRideToCancel(null)}
+        title="האם אתה בטוח שאתה רוצה לבטל את הנסיעה?"
+        confirmLabel="אישור"
+        variant="danger"
+        loading={cancelling}
+        onConfirm={handleConfirmCancel}
+        titleId="confirm-cancel-ride-title"
+      />
     </div>
   );
 }

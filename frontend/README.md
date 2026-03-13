@@ -1,3 +1,73 @@
+# Linkup Frontend (React + Vite)
+
+אפליקציית ווב ב-React + TypeScript (Vite) ל-Linkup: ניהול נסיעות, קבוצות, צ'אט בזמן אמת, התחברות עם Google ואימייל/סיסמה, תמונות פרופיל (S3) ותמיכה מלאה ב-RTL בעברית.
+
+---
+
+## דרישות
+
+- Node.js 18+
+- npm (או pnpm / yarn אם מעדיפים)
+- Backend רץ (ברירת מחדל: `http://127.0.0.1:8000`)
+
+---
+
+## התקנה והרצה בפיתוח
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+ברירת המחדל של Vite היא `http://localhost:5173`.  
+הבקשות ל-API עוברות דרך proxy של Vite אל ה-backend (ללא בעיות CORS) כאשר עובדים ב-dev.
+
+---
+
+## משתני סביבה (`frontend/.env`)
+
+יש קובץ `frontend/.env.example` עם ברירות מחדל. כדי להתחיל:
+
+```bash
+cp frontend/.env.example frontend/.env
+# ערוך את frontend/.env לפי הצורך
+```
+
+המשתנים העיקריים:
+
+- `VITE_API_URL` – בסיס ל-REST API בפרודקשן (למשל `https://api.example.com/api/v1`).  
+  בפיתוח, אם לא נגדיר – נשתמש בכתובת ברירת המחדל `http://127.0.0.1:8000/api/v1` דרך proxy של Vite.
+- `VITE_CHAT_WS_URL` – בסיס ל-WebSocket של הצ'אט (למשל `ws://localhost:8081/ws` או `wss://chat.example.com/ws`). אם לא הוגדר, משתמשים בכתובת שיושבת על אותו origin כמו הדפדפן.
+- `VITE_API_TIMEOUT_MS` – timeout לבקשות HTTP במילישניות (ברירת מחדל: `30000`).
+- `VITE_GOOGLE_MAPS_API_KEY` – מפתח Google Maps להצגת מפה ונתיב נסיעה (אופציונלי; חלק מהמסכים עובדים גם בלעדיו).
+- `VITE_GOOGLE_CLIENT_ID` – Client ID של Google OAuth (חובה לכניסה עם Google, בשימוש ב-`GoogleSignIn`).
+
+הקובץ `src/config/env.ts` מרכז את הקריאה למשתנים האלה ומספק fallback הגיוני לסביבת פיתוח.
+
+---
+
+## סקריפטים שימושיים
+
+- `npm run dev` – הרצה חיה עם HMR ב-`http://localhost:5173`.
+- `npm run build` – בניית production ל-`dist/`.
+- `npm run preview` – הרצת build מקומי לבדיקה.
+- `npm run lint` – הרצת ESLint על TypeScript/React.
+
+---
+
+## נקודות מפתח בפרונטנד
+
+- **RTL ועברית** – האפליקציה בנויה מיסודה ל-RTL; סגנונות וקומפוננטות `pages/*` מותאמות לימין.
+- **אימות** – קומפוננטות התחברות/הרשמה עובדות מול backend OAuth/JWT; תמיכה ב-Google Sign-In באמצעות `GoogleSignIn.tsx` ו-`VITE_GOOGLE_CLIENT_ID`.
+- **ניהול קבוצות** – במסכי `GroupManage` אפשר ליצור קבוצה, לשתף קישור הזמנה, להעתיק URL בלחיצה עם פידבק חזותי (העתקה מוצלחת/שגיאה) ולסגור קבוצה.
+- **צ'אט** – הצ'אט עצמו מנוהל מול שירות ה-WebSocket (`chat-ws`) דרך URL שמוגדר ב-`VITE_CHAT_WS_URL`.
+
+למידע רחב יותר על הארכיטקטורה וההרצה הכוללת (Docker, Kubernetes, chat-ws, mobile) ראו את ה-`README` בשורש הפרויקט.
+
+---
+
+<!-- Original Vite README (template) below for reference -->
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.

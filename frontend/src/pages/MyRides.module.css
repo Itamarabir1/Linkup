@@ -1,64 +1,102 @@
 .page {
-  padding: 1rem 1.5rem;
-  max-width: 800px;
-  margin: 0 auto;
+  padding: 20px 24px;
+  min-height: 0;
   text-align: right;
 }
 
-.pageHeader {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.pageTitle {
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-}
-
 .pageError {
-  color: #dc2626;
+  color: var(--danger-text);
   margin-bottom: 1rem;
 }
 
-.pageLoading,
-.emptyText {
+.pageLoading {
   text-align: center;
-  color: #6b7280;
-  padding: 2rem;
+  color: var(--text-secondary);
+  padding: 3rem;
 }
 
-.cardList {
+.emptyState {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 24px 60px;
+  text-align: center;
 }
 
-.card {
-  background: #fff;
-  padding: 1rem 1.25rem;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  border-right: 4px solid #2563eb;
+.emptyIcon {
+  color: #d1d5db;
+  margin-bottom: 1rem;
 }
 
-.cardRideWrap {
+.emptyTitle {
+  font-family: "Heebo", sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem;
+}
+
+.emptySubtitle {
+  font-family: "Heebo", sans-serif;
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0 0 1.5rem;
+}
+
+.btnPrimary {
+  height: 36px;
+  padding: 0 16px;
+  border: none;
+  background: var(--primary);
+  color: white;
+  border-radius: 8px;
+  font-family: "Heebo", sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.btnPrimary:hover {
+  background: var(--primary-hover);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cardWrap {
   position: relative;
 }
 
-.cardRideDeleteBtn {
+.cardDeleteBtn {
   position: absolute;
-  top: 0.75rem;
-  left: 0.75rem;
-  width: 32px;
-  height: 32px;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
   border: none;
-  background: rgba(220, 38, 38, 0.12);
-  color: #dc2626;
-  font-size: 1.25rem;
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  font-size: 1.1rem;
   line-height: 1;
   border-radius: 8px;
   cursor: pointer;
@@ -66,109 +104,41 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  transition: background 0.2s, color 0.2s;
+  z-index: 1;
+  transition: background 0.2s;
 }
 
-.cardRideDeleteBtn:hover {
-  background: rgba(220, 38, 38, 0.25);
-}
-
-.cardRoute {
-  font-weight: 600;
-  font-size: 1rem;
-}
-
-.cardMeta {
-  font-size: 0.9rem;
-  color: #6b7280;
-  margin-top: 0.25rem;
-}
-
-.cardRouteSummary {
-  font-style: italic;
-  color: #4b5563;
-}
-
-.btn {
-  display: inline-block;
-  padding: 0.6rem 1.2rem;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  text-decoration: none;
-  border: none;
-  cursor: pointer;
-  text-align: center;
-}
-
-.btnPrimary {
-  background: #2563eb;
-  color: #fff;
-}
-
-.btnPrimary:hover {
-  background: #1d4ed8;
+.cardDeleteBtn:hover {
+  background: rgba(220, 38, 38, 0.2);
 }
 
 .btnOutline {
-  background: transparent;
-  color: #374151;
-  border: 1px solid #d1d5db;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
 }
 
 .btnOutline:hover {
-  background: #f3f4f6;
+  background: var(--bg-secondary);
 }
 
 .btnDanger {
-  background: #dc2626;
-  color: #fff;
-  margin-top: 1rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  border: none;
+  background: var(--danger-text);
+  color: white;
+  cursor: pointer;
 }
 
 .btnDanger:hover {
   background: #b91c1c;
 }
 
-.confirmModalBackdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-  box-sizing: border-box;
-}
-
-.confirmModalBox {
-  background: #fff;
-  border-radius: 12px;
-  padding: 1.5rem;
-  max-width: 360px;
-  width: 100%;
-  text-align: center;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-}
-
-.confirmModalTitle {
-  font-size: 1.1rem;
-  margin: 0 0 1rem 0;
-  color: #111;
-}
-
-.confirmModalActions {
-  display: flex;
-  gap: 0.75rem;
-  justify-content: center;
-  margin-top: 1.25rem;
-}
-
-.confirmModalActions .btn {
-  width: 120px;
-  min-width: 120px;
-  padding: 0.6rem 1rem;
-  margin: 0;
-  box-sizing: border-box;
-}

@@ -168,6 +168,13 @@ class RideService:
         rides = await crud_ride.get_by_driver_id(db, driver_id, status_enum)
         return [RideResponse.model_validate(r) for r in rides]
 
+    async def get_rides_by_group_id(
+        self, db: AsyncSession, group_id: UUID
+    ) -> List[RideResponse]:
+        """רשימת נסיעות של קבוצה (לטאב נסיעות במסך קבוצה). לא בודק חברות – יש לקרוא רק אחרי אימות שהמשתמש חבר בקבוצה."""
+        rides = await crud_ride.get_by_group_id(db, group_id, exclude_cancelled=True)
+        return [RideResponse.model_validate(r) for r in rides]
+
     # --- Update (partial) ---
 
     async def update_ride(

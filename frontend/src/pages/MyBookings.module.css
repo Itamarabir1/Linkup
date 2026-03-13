@@ -1,156 +1,267 @@
 .page {
-  padding: 1rem 1.5rem;
+  padding: 20px 24px;
   max-width: 800px;
   margin: 0 auto;
   text-align: right;
 }
 
-.pageTitle {
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-}
-
-.pageMeta {
-  color: #6b7280;
-  margin-bottom: 1rem;
-}
-
 .pageTabs {
   display: flex;
-  gap: 0.5rem;
+  gap: 0;
   margin-bottom: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab,
+.tabActive {
+  height: 44px;
+  padding: 0 1rem;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: "Heebo", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: -1px;
+}
+
+.tab:hover {
+  color: var(--text-primary);
+}
+
+.tabActive {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  font-weight: 600;
 }
 
 .pageError {
-  color: #dc2626;
+  color: var(--danger-text);
   margin-bottom: 1rem;
 }
 
 .pageLoading,
 .emptyText {
   text-align: center;
-  color: #6b7280;
+  color: var(--text-secondary);
   padding: 2rem;
 }
 
 .cardList {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
-.card {
-  background: #fff;
+.bookingCard {
+  background: var(--bg-card);
   padding: 1rem 1.25rem;
   border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  border-right: 4px solid #2563eb;
-}
-
-.cardRide {
-  /* same as card, ride variant */
-}
-
-.cardRideWrap {
-  position: relative;
+  border: 1px solid var(--border);
 }
 
 .cardRoute {
   font-weight: 600;
   font-size: 1rem;
+  color: var(--text-primary);
 }
 
 .cardMeta {
   font-size: 0.9rem;
-  color: #6b7280;
+  color: var(--text-secondary);
   margin-top: 0.25rem;
 }
 
-.cardRouteSummary {
-  font-style: italic;
-  color: #4b5563;
-}
-
-.btn {
-  display: inline-block;
-  padding: 0.6rem 1.2rem;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  text-decoration: none;
-  border: none;
-  cursor: pointer;
-  text-align: center;
-}
-
-.btnPrimary {
-  background: #2563eb;
-  color: #fff;
-}
-
-.btnPrimary:hover {
-  background: #1d4ed8;
+.bookingCardActions {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .btnOutline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
   background: transparent;
-  color: #374151;
-  border: 1px solid #d1d5db;
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  cursor: pointer;
 }
 
 .btnOutline:hover {
-  background: #f3f4f6;
+  background: var(--bg-secondary);
 }
 
 .btnDanger {
-  background: #dc2626;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  background: var(--danger-text);
   color: #fff;
-  margin-top: 1rem;
+  border: none;
+  cursor: pointer;
 }
 
 .btnDanger:hover {
-  background: #b91c1c;
+  filter: brightness(0.9);
 }
 
-.confirmModalBackdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+/* Driver block */
+.driverBlock {
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+}
+
+.driverBlockHeader {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.driverBlockCounts {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.countSep {
+  margin-right: 0.75rem;
+}
+
+.passengerList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.passengerRow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.passengerRow:last-child {
+  border-bottom: none;
+}
+
+.passengerAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-  box-sizing: border-box;
+  color: #fff;
+  font-weight: 600;
+  font-size: 1rem;
+  flex-shrink: 0;
 }
 
-.confirmModalBox {
-  background: #fff;
-  border-radius: 12px;
-  padding: 1.5rem;
-  max-width: 360px;
-  width: 100%;
-  text-align: center;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+.passengerInfo {
+  flex: 1;
+  min-width: 0;
 }
 
-.confirmModalTitle {
-  font-size: 1.1rem;
-  margin: 0 0 1rem 0;
-  color: #111;
+.passengerName {
+  font-weight: 500;
+  color: var(--text-primary);
 }
 
-.confirmModalActions {
+.passengerMeta {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin-top: 0.15rem;
+}
+
+.passengerActions {
   display: flex;
-  gap: 0.75rem;
-  justify-content: center;
-  margin-top: 1.25rem;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
 }
 
-.confirmModalActions .btn {
-  width: 120px;
-  min-width: 120px;
-  padding: 0.6rem 1rem;
-  margin: 0;
-  box-sizing: border-box;
+.btnApprove {
+  padding: 0.35rem 0.75rem;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.btnApprove:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.btnApprove:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btnReject {
+  padding: 0.35rem 0.75rem;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  background: transparent;
+  color: var(--danger-text);
+  border: 1px solid var(--danger-text);
+  cursor: pointer;
+}
+
+.btnReject:hover:not(:disabled) {
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.btnReject:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btnChat {
+  padding: 0.35rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btnChat:hover:not(:disabled) {
+  background: var(--bg-secondary);
+  color: var(--primary);
+}
+
+.btnChat:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.statusConfirmed {
+  font-size: 13px;
+  color: var(--success-text);
+  font-weight: 500;
+}
+
+.statusRejected {
+  font-size: 13px;
+  color: var(--text-secondary);
 }

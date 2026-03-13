@@ -60,13 +60,23 @@
   cursor: not-allowed;
 }
 
-.btnPrimaryCopied {
-  background: #1d4ed8;
+.btnCopy {
+  transition: transform 100ms ease, background-color 100ms ease, color 100ms ease;
+}
+
+.btnCopy:active {
+  transform: scale(0.95);
+  background-color: var(--primary-dark, #1d4ed8);
+}
+
+.btnCopySuccess {
+  background: #16a34a;
+  border-color: #16a34a;
   color: #fff;
 }
 
-.btnPrimaryCopied:hover {
-  background: #1d4ed8;
+.btnCopySuccess:hover {
+  background: #15803d;
 }
 
 .successSection {
@@ -99,6 +109,12 @@
   font-size: 0.95rem;
   direction: ltr;
   text-align: left;
+}
+
+.inviteError {
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: #dc2626;
 }
 
 .copiedToast {

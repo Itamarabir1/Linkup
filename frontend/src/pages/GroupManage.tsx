@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Search, Plus, Settings, MoreVertical, Crown } from 'lucide-react';
 import {
   getGroupMembers,
   removeMember,
@@ -7,29 +8,114 @@ import {
   leaveGroup,
   closeGroup,
   renameGroup,
+  updateGroup,
+  getGroupRides,
+  getGroupImageUploadUrl,
+  confirmGroupImage,
+  deleteGroupImage,
 } from '../api/groups';
 import { useAuth } from '../context/AuthContext';
 import { useGroup } from '../context/GroupContext';
 import type { GroupMember as GroupMemberType } from '../types/api';
+import type { Ride } from '../types/api';
+import { formatRideDate } from '../utils/date';
+import Chips, { type ChipItem } from '../components/Chips/Chips';
+import RideCard from '../components/RideCard/RideCard';
+import ConfirmModal from '../components/ConfirmModal/ConfirmModal';
 import styles from './GroupManage.module.css';
+
+const AVATAR_COLORS = ['#6366f1', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0ea5e9'];
+
+function getStatusLabel(r: Ride): string {
+  if (r.status === 'cancelled') return 'בוטלה';
+  const seats = r.available_seats ?? 0;
+  if (seats <= 0) return 'מלא';
+  if (seats === 1) return '1 מקום';
+  return `${seats} מקומות`;
+}
+
+function isToday(d: Date): boolean {
+  const today = new Date();
+  return (
+    d.getFullYear() === today.getFullYear() &&
+    d.getMonth() === today.getMonth() &&
+    d.getDate() === today.getDate()
+  );
+}
+
+function isTomorrow(d: Date): boolean {
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return (
+    d.getFullYear() === tomorrow.getFullYear() &&
+    d.getMonth() === tomorrow.getMonth() &&
+    d.getDate() === tomorrow.getDate()
+  );
+}
+
+function isThisWeek(d: Date): boolean {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+  const t = d.getTime();
+  return t >= start.getTime() && t < end.getTime();
+}
+
+type GroupTab = 'rides' | 'members' | 'settings';
 
 export default function GroupManage() {
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { myGroups, isLoadingGroups, refreshGroups } = useGroup();
+  const { myGroups, isLoadingGroups, refreshGroups, setActiveGroup } = useGroup();
   const [members, setMembers] = useState<GroupMemberType[]>([]);
+  const [rides, setRides] = useState<Ride[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(true);
+  const [loadingRides, setLoadingRides] = useState(false);
   const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState<GroupTab>('rides');
+  const [dateChip, setDateChip] = useState<string>('all');
   const [editingName, setEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState('');
   const [savingName, setSavingName] = useState(false);
   const [copyInviteDone, setCopyInviteDone] = useState(false);
+  const [copyInviteError, setCopyInviteError] = useState<string | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [membersModalOpen, setMembersModalOpen] = useState(false);
+  const [membersSearch, setMembersSearch] = useState('');
+  const [editDescriptionValue, setEditDescriptionValue] = useState('');
+  const [savingDescription, setSavingDescription] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageDeleting, setImageDeleting] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const group = groupId ? (myGroups.find((g) => g.group_id === groupId) ?? null) : null;
+  const MEMBERS_PREVIEW = 8;
+  const filteredMembers = members.filter((m) =>
+    (m.full_name ?? '').toLowerCase().includes(membersSearch.trim().toLowerCase())
+  );
+
+  const dateChipItems: ChipItem[] = [
+    { id: 'all', label: 'הכל' },
+    { id: 'today', label: 'היום' },
+    { id: 'tomorrow', label: 'מחר' },
+    { id: 'week', label: 'השבוע' },
+  ];
+
+  const displayedRides = rides.filter((r) => {
+    if (r.status === 'cancelled') return false;
+    if (dateChip === 'all') return true;
+    const d = new Date(r.departure_time);
+    if (dateChip === 'today') return isToday(d);
+    if (dateChip === 'tomorrow') return isTomorrow(d);
+    if (dateChip === 'week') return isThisWeek(d);
+    return true;
+  });
 
   const loadMembers = useCallback(async () => {
     if (!groupId) return;
@@ -46,6 +132,21 @@ export default function GroupManage() {
     }
   }, [groupId]);
 
+  const loadRides = useCallback(async () => {
+    if (!groupId) return;
+    setLoadingRides(true);
+    setError('');
+    try {
+      const list = await getGroupRides(groupId);
+      setRides(Array.isArray(list) ? list : []);
+    } catch {
+      setError('טעינת נסיעות הקבוצה נכשלה');
+      setRides([]);
+    } finally {
+      setLoadingRides(false);
+    }
+  }, [groupId]);
+
   useEffect(() => {
     refreshGroups();
   }, [refreshGroups]);
@@ -55,8 +156,26 @@ export default function GroupManage() {
   }, [loadMembers]);
 
   useEffect(() => {
+    if (activeTab === 'rides') loadRides();
+  }, [activeTab, loadRides]);
+
+  useEffect(() => {
     if (group && !editingName) setEditNameValue(group.name);
   }, [group?.name, editingName]);
+
+  useEffect(() => {
+    if (group) setEditDescriptionValue(group.description ?? '');
+  }, [group?.description]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpenDropdown(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   if (!groupId) {
     return (
@@ -83,14 +202,20 @@ export default function GroupManage() {
   }
 
   const isAdmin = group.admin_id === user?.user_id;
-  const inviteUrl = typeof window !== 'undefined' ? `${window.location.origin}/join/${group.invite_code}` : '';
+  const inviteUrl =
+    typeof window !== 'undefined' ? `${window.location.origin}/join/${group.invite_code}` : '';
 
-  const handleCopyInvite = () => {
+  const handleCopyInvite = async () => {
     if (!inviteUrl) return;
-    navigator.clipboard.writeText(inviteUrl).then(() => {
+    setCopyInviteError(null);
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
       setCopyInviteDone(true);
       setTimeout(() => setCopyInviteDone(false), 2000);
-    });
+    } catch (err) {
+      const message = (err as Error)?.message || 'העתקה נכשלה. נסה שוב.';
+      setCopyInviteError(message);
+    }
   };
 
   const handleSaveName = async () => {
@@ -113,6 +238,7 @@ export default function GroupManage() {
   };
 
   const handleRemoveMember = async (userId: string) => {
+    setOpenDropdown(null);
     setActionLoading(true);
     setError('');
     try {
@@ -127,6 +253,7 @@ export default function GroupManage() {
   };
 
   const handlePromoteMember = async (userId: string) => {
+    setOpenDropdown(null);
     setActionLoading(true);
     setError('');
     try {
@@ -146,8 +273,9 @@ export default function GroupManage() {
     try {
       await leaveGroup(groupId);
       setConfirmLeave(false);
+      setActiveGroup(null);
       await refreshGroups();
-      navigate('/', { replace: true });
+      navigate('/groups', { replace: true });
     } catch {
       setError('עזיבת הקבוצה נכשלה');
     } finally {
@@ -161,8 +289,9 @@ export default function GroupManage() {
     try {
       await closeGroup(groupId);
       setConfirmClose(false);
+      setActiveGroup(null);
       await refreshGroups();
-      navigate('/', { replace: true });
+      navigate('/groups', { replace: true });
     } catch {
       setError('סגירת הקבוצה נכשלה');
     } finally {
@@ -170,182 +299,485 @@ export default function GroupManage() {
     }
   };
 
+  const handleSaveDescription = async () => {
+    const val = editDescriptionValue.slice(0, 500);
+    setSavingDescription(true);
+    setError('');
+    try {
+      await updateGroup(groupId, { description: val || undefined });
+      await refreshGroups();
+    } catch {
+      setError('שמירת התיאור נכשלה');
+    } finally {
+      setSavingDescription(false);
+    }
+  };
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !groupId) return;
+    e.target.value = '';
+    setImageUploading(true);
+    setError('');
+    try {
+      const { upload_url, key } = await getGroupImageUploadUrl(groupId);
+      await fetch(upload_url, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': 'image/webp' },
+      });
+      await confirmGroupImage(groupId, key);
+      await refreshGroups();
+    } catch {
+      setError('העלאת התמונה נכשלה');
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const handleDeleteImage = async () => {
+    setImageDeleting(true);
+    setError('');
+    try {
+      await deleteGroupImage(groupId);
+      await refreshGroups();
+    } catch {
+      setError('מחיקת התמונה נכשלה');
+    } finally {
+      setImageDeleting(false);
+    }
+  };
+
+  const groupAvatarColor = AVATAR_COLORS[Math.abs(group.name.length) % AVATAR_COLORS.length];
+
   return (
     <div className={styles.page}>
-      <div className={styles.groupNameWrap}>
-        {editingName ? (
-          <>
-            <input
-              type="text"
-              className={styles.groupNameInput}
-              value={editNameValue}
-              onChange={(e) => setEditNameValue(e.target.value)}
-              onBlur={handleSaveName}
-              onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
-              disabled={savingName}
-              autoFocus
-            />
-            {savingName && <span>שומר...</span>}
-          </>
+      <header className={styles.header}>
+        {group.avatar_url ? (
+          <img src={group.avatar_url} alt="" className={styles.headerAvatarImg} />
         ) : (
+          <div
+            className={styles.headerAvatar}
+            style={{ backgroundColor: groupAvatarColor }}
+          >
+            {group.name.charAt(0).toUpperCase()}
+          </div>
+        )}
+        <div className={styles.headerInfo}>
+          <h1 className={styles.headerName}>{group.name}</h1>
+          <p className={styles.headerMeta}>
+            {group.member_count ?? members.length} חברים
+            {group.is_active === false && ' · לא פעילה'}
+          </p>
+          {group.description && (
+            <p className={styles.headerDescription}>{group.description}</p>
+          )}
+        </div>
+        <div className={styles.headerActions}>
           <button
             type="button"
-            className={styles.pageTitle}
-            style={{ border: 'none', background: 'none', cursor: isAdmin ? 'pointer' : 'default', padding: 0 }}
-            onClick={() => isAdmin && setEditingName(true)}
+            className={styles.headerBtn}
+            onClick={() => navigate('/search')}
+            title="חפש בקבוצה"
           >
-            {group.name}
+            <Search size={18} />
+            חפש בקבוצה
+          </button>
+          <button
+            type="button"
+            className={styles.headerBtnPrimary}
+            onClick={() => navigate('/create-ride', { state: { groupId } })}
+            title="הצע נסיעה לקבוצה"
+          >
+            <Plus size={18} />
+            הצע נסיעה לקבוצה
+          </button>
+          {isAdmin && (
+            <button
+              type="button"
+              className={styles.headerIconBtn}
+              onClick={() => setActiveTab('settings')}
+              title="הגדרות"
+            >
+              <Settings size={20} />
+            </button>
+          )}
+        </div>
+      </header>
+
+      <div role="tablist" className={styles.tabs}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'rides'}
+          className={activeTab === 'rides' ? styles.tabActive : styles.tab}
+          onClick={() => setActiveTab('rides')}
+        >
+          נסיעות
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'members'}
+          className={activeTab === 'members' ? styles.tabActive : styles.tab}
+          onClick={() => setActiveTab('members')}
+        >
+          חברים
+        </button>
+        {isAdmin && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'settings'}
+            className={activeTab === 'settings' ? styles.tabActive : styles.tab}
+            onClick={() => setActiveTab('settings')}
+          >
+            הגדרות
           </button>
         )}
       </div>
 
       {error && <p className={styles.pageError}>{error}</p>}
 
-      <section className={styles.inviteSection}>
-        <div className={styles.inviteLabel}>קישור הזמנה</div>
-        <div className={styles.inviteRow}>
-          <input type="text" className={styles.inviteInput} value={inviteUrl} readOnly />
-          <button type="button" className={`${styles.btn} ${styles.btnPrimary}`} onClick={handleCopyInvite}>
-            העתק
-          </button>
-          {copyInviteDone && <span className={styles.copiedToast}>הועתק!</span>}
-        </div>
-      </section>
-
-      <h2 className={styles.membersTitle}>חברי הקבוצה</h2>
-      {loadingMembers ? (
-        <div className={styles.pageLoading}>טוען חברים...</div>
-      ) : (
-        <div className={styles.memberList}>
-          {members.length === 0 ? (
-            <p className={styles.emptyText}>אין חברים בקבוצה.</p>
+      {activeTab === 'rides' && (
+        <>
+          <Chips items={dateChipItems} activeId={dateChip} onChange={setDateChip} />
+          {loadingRides ? (
+            <div className={styles.pageLoading}>טוען נסיעות...</div>
+          ) : displayedRides.length === 0 ? (
+            <div className={styles.emptyState}>
+              <p className={styles.emptyText}>אין נסיעות בקבוצה בתקופה הזו.</p>
+              <button
+                type="button"
+                className={styles.btnPrimary}
+                onClick={() => navigate('/create-ride', { state: { groupId } })}
+              >
+                <Plus size={14} />
+                הצע נסיעה
+              </button>
+            </div>
           ) : (
-            members.map((m) => {
-              const isCurrentUser = m.user_id === user?.user_id;
-              const canRemove = isAdmin && !isCurrentUser && m.role !== 'admin';
-              const canPromote = isAdmin && m.role === 'member';
-              return (
-                <div key={m.id} className={styles.memberRow}>
-                  <div className={styles.memberInfo}>
-                    <span className={styles.memberName}>{m.full_name ?? m.user_id}</span>
-                    <span className={`${styles.roleBadge} ${m.role === 'admin' ? styles.roleBadgeAdmin : ''}`}>
-                      {m.role === 'admin' ? 'מנהל' : 'חבר'}
-                    </span>
-                  </div>
-                  <div className={styles.memberActions}>
-                    {canPromote && (
-                      <button
-                        type="button"
-                        className={`${styles.btn} ${styles.btnOutline}`}
-                        onClick={() => handlePromoteMember(m.user_id)}
-                        disabled={actionLoading}
-                      >
-                        הפוך למנהל
-                      </button>
+            <div className={styles.ridesGrid}>
+              {displayedRides.map((r) => (
+                <RideCard
+                  key={r.ride_id}
+                  route={`${r.destination_name ?? '?'} ← ${r.origin_name ?? '?'}`}
+                  time={formatRideDate(r.departure_time)}
+                  status={getStatusLabel(r)}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {activeTab === 'members' && (
+        <>
+          {loadingMembers ? (
+            <div className={styles.pageLoading}>טוען חברים...</div>
+          ) : (
+            <>
+              <p className={styles.membersCountHeader}>
+                {members.length} חברים
+              </p>
+              <ul className={styles.memberList}>
+                {members.length === 0 ? (
+                  <p className={styles.emptyText}>אין חברים בקבוצה.</p>
+                ) : (
+                  members.slice(0, MEMBERS_PREVIEW).map((m) => {
+                  const isCurrentUser = m.user_id === user?.user_id;
+                  const canRemove = isAdmin && !isCurrentUser && m.role !== 'admin';
+                  const canPromote = isAdmin && m.role === 'member';
+                  const showDropdown = canRemove || canPromote;
+                  const isOpen = openDropdown === m.id;
+                  return (
+                    <li key={m.id} className={styles.memberRow}>
+                      <div className={styles.memberInfo}>
+                        <span className={styles.memberName}>{m.full_name ?? m.user_id}</span>
+                        <span
+                          className={`${styles.roleBadge} ${m.role === 'admin' ? styles.roleBadgeAdmin : ''}`}
+                          title={m.role === 'admin' ? 'מנהל' : undefined}
+                        >
+                          {m.role === 'admin' ? (
+                            <>
+                              <Crown size={12} className={styles.roleCrown} />
+                              מנהל
+                            </>
+                          ) : (
+                            'חבר'
+                          )}
+                        </span>
+                      </div>
+                      {showDropdown && (
+                        <div className={styles.memberDropdownWrap} ref={dropdownRef}>
+                          <button
+                            type="button"
+                            className={styles.memberDropdownTrigger}
+                            onClick={() => setOpenDropdown(isOpen ? null : m.id)}
+                            aria-expanded={isOpen}
+                            aria-haspopup="true"
+                          >
+                            <MoreVertical size={18} />
+                          </button>
+                          {isOpen && (
+                            <div className={styles.memberDropdownMenu}>
+                              {canPromote && (
+                                <button
+                                  type="button"
+                                  className={styles.dropdownItem}
+                                  onClick={() => handlePromoteMember(m.user_id)}
+                                  disabled={actionLoading}
+                                >
+                                  קדם למנהל
+                                </button>
+                              )}
+                              {canRemove && (
+                                <button
+                                  type="button"
+                                  className={styles.dropdownItemDanger}
+                                  onClick={() => handleRemoveMember(m.user_id)}
+                                  disabled={actionLoading}
+                                >
+                                  הסר
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </li>
+                  );
+                  })
+                )}
+              </ul>
+              {members.length > MEMBERS_PREVIEW && (
+                <button
+                  type="button"
+                  className={styles.seeMoreBtn}
+                  onClick={() => setMembersModalOpen(true)}
+                >
+                  See More · עוד ({members.length} חברים)
+                </button>
+              )}
+              {membersModalOpen && (
+                <div
+                  className={styles.modalBackdrop}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="members-modal-title"
+                  onClick={() => setMembersModalOpen(false)}
+                >
+                  <div
+                    className={styles.membersModalBox}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <h2 id="members-modal-title" className={styles.membersModalTitle}>
+                      חברי הקבוצה
+                    </h2>
+                    <input
+                      type="text"
+                      className={styles.membersSearchInput}
+                      placeholder="חפש לפי שם..."
+                      value={membersSearch}
+                      onChange={(e) => setMembersSearch(e.target.value)}
+                      aria-label="חיפוש חברים"
+                    />
+                    <ul className={styles.membersModalList}>
+                      {filteredMembers.map((m) => (
+                        <li key={m.id} className={styles.membersModalRow}>
+                          <div
+                            className={styles.memberAvatarSmall}
+                            style={{
+                              backgroundColor:
+                                AVATAR_COLORS[Math.abs((m.full_name ?? '').length) % AVATAR_COLORS.length],
+                            }}
+                          >
+                            {(m.full_name ?? 'נ').charAt(0).toUpperCase()}
+                          </div>
+                          <span className={styles.membersModalName}>
+                            {m.full_name ?? m.user_id}
+                          </span>
+                          {m.role === 'admin' && (
+                            <span className={styles.roleBadgeAdmin}>
+                              <Crown size={12} /> מנהל
+                            </span>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                    {filteredMembers.length === 0 && (
+                      <p className={styles.emptyText}>אין תוצאות</p>
                     )}
-                    {canRemove && (
-                      <button
-                        type="button"
-                        className={`${styles.btn} ${styles.btnDanger}`}
-                        onClick={() => handleRemoveMember(m.user_id)}
-                        disabled={actionLoading}
-                      >
-                        הסר
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      className={styles.btnOutline}
+                      onClick={() => setMembersModalOpen(false)}
+                    >
+                      סגור
+                    </button>
                   </div>
                 </div>
-              );
-            })
+              )}
+            </>
           )}
-        </div>
+          <div className={styles.leaveSection}>
+            <button
+              type="button"
+              className={styles.btnDanger}
+              onClick={() => setConfirmLeave(true)}
+              disabled={actionLoading}
+            >
+              צא מהקבוצה
+            </button>
+          </div>
+        </>
       )}
 
-      <div className={styles.actionsSection}>
-        {!isAdmin && (
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnDanger}`}
-            onClick={() => setConfirmLeave(true)}
-            disabled={actionLoading}
-          >
-            עזוב קבוצה
-          </button>
-        )}
-        {isAdmin && (
-          <button
-            type="button"
-            className={`${styles.btn} ${styles.btnDanger}`}
-            onClick={() => setConfirmClose(true)}
-            disabled={actionLoading}
-          >
-            סגור קבוצה
-          </button>
-        )}
-      </div>
+      {activeTab === 'settings' && isAdmin && (
+        <div className={styles.settingsSection}>
+          <h2 className={styles.settingsTitle}>פרטי קבוצה</h2>
+          <div className={styles.settingsNameRow}>
+            {editingName ? (
+              <>
+                <input
+                  type="text"
+                  className={styles.groupNameInput}
+                  value={editNameValue}
+                  onChange={(e) => setEditNameValue(e.target.value)}
+                  onBlur={handleSaveName}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
+                  disabled={savingName}
+                  autoFocus
+                />
+                {savingName && <span className={styles.savingHint}>שומר...</span>}
+              </>
+            ) : (
+              <button
+                type="button"
+                className={styles.settingsNameBtn}
+                onClick={() => setEditingName(true)}
+              >
+                {group.name}
+              </button>
+            )}
+          </div>
 
-      {confirmLeave && (
-        <div
-          className={styles.confirmModalBackdrop}
-          role="dialog"
-          aria-modal="true"
-          onClick={() => !actionLoading && setConfirmLeave(false)}
-        >
-          <div className={styles.confirmModalBox} onClick={(e) => e.stopPropagation()}>
-            <h2 className={styles.confirmModalTitle}>לעזוב את הקבוצה?</h2>
-            <div className={styles.confirmModalActions}>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnOutline}`}
-                onClick={() => setConfirmLeave(false)}
-                disabled={actionLoading}
-              >
-                ביטול
-              </button>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnDanger}`}
-                onClick={handleLeave}
-                disabled={actionLoading}
-              >
-                {actionLoading ? '...' : 'עזוב'}
-              </button>
+          <div className={styles.settingsRow}>
+            <label className={styles.settingsLabel}>תיאור</label>
+            <div className={styles.settingsDescriptionWrap}>
+              <textarea
+                className={styles.settingsDescriptionInput}
+                value={editDescriptionValue}
+                onChange={(e) => setEditDescriptionValue(e.target.value.slice(0, 500))}
+                onBlur={handleSaveDescription}
+                disabled={savingDescription}
+                rows={3}
+                maxLength={500}
+                placeholder="תיאור קצר של הקבוצה (עד 500 תווים)"
+              />
+              <span className={styles.charCount}>
+                {editDescriptionValue.length}/500
+              </span>
             </div>
+          </div>
+
+          <div className={styles.settingsRow}>
+            <label className={styles.settingsLabel}>תמונת קבוצה</label>
+            <div className={styles.settingsImageWrap}>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className={styles.hiddenInput}
+                onChange={handleImageSelect}
+              />
+              {group.avatar_url ? (
+                <>
+                  <img
+                    src={group.avatar_url}
+                    alt=""
+                    className={styles.settingsGroupImage}
+                  />
+                  <div className={styles.settingsImageActions}>
+                    <button
+                      type="button"
+                      className={styles.btnOutline}
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={imageUploading}
+                    >
+                      {imageUploading ? 'מעלה...' : 'החלף'}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.btnDanger}
+                      onClick={handleDeleteImage}
+                      disabled={imageDeleting}
+                    >
+                      {imageDeleting ? 'מוחק...' : 'הסר'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.btnOutline}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={imageUploading}
+                >
+                  {imageUploading ? 'מעלה...' : 'העלה תמונה'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <h3 className={styles.inviteLabel}>קוד הצטרפות</h3>
+          <div className={styles.inviteRow}>
+            <input type="text" className={styles.inviteInput} value={inviteUrl} readOnly />
+            <button
+              type="button"
+              className={`${styles.btnCopy} ${copyInviteDone ? styles.btnCopySuccess : ''}`}
+              onClick={handleCopyInvite}
+            >
+              {copyInviteDone ? '✓ הועתק!' : 'העתק'}
+            </button>
+          </div>
+          {copyInviteError && <p className={styles.inviteError}>{copyInviteError}</p>}
+
+          <div className={styles.dangerZone}>
+            <h3 className={styles.dangerZoneTitle}>אזור מסוכן</h3>
+            <button
+              type="button"
+              className={styles.btnDanger}
+              onClick={() => setConfirmClose(true)}
+              disabled={actionLoading}
+            >
+              מחק קבוצה
+            </button>
           </div>
         </div>
       )}
 
-      {confirmClose && (
-        <div
-          className={styles.confirmModalBackdrop}
-          role="dialog"
-          aria-modal="true"
-          onClick={() => !actionLoading && setConfirmClose(false)}
-        >
-          <div className={styles.confirmModalBox} onClick={(e) => e.stopPropagation()}>
-            <h2 className={styles.confirmModalTitle}>לסגור את הקבוצה?</h2>
-            <p style={{ color: '#6b7280', marginTop: 0 }}>חברים לא יוכלו יותר להצטרף. ניתן יהיה לפתוח מחדש בעתיד.</p>
-            <div className={styles.confirmModalActions}>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnOutline}`}
-                onClick={() => setConfirmClose(false)}
-                disabled={actionLoading}
-              >
-                ביטול
-              </button>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnDanger}`}
-                onClick={handleClose}
-                disabled={actionLoading}
-              >
-                {actionLoading ? '...' : 'סגור קבוצה'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmModal
+        open={confirmLeave}
+        onClose={() => setConfirmLeave(false)}
+        title="לעזוב את הקבוצה?"
+        confirmLabel="עזוב"
+        variant="danger"
+        loading={actionLoading}
+        onConfirm={handleLeave}
+        titleId="confirm-leave-title"
+      />
+      <ConfirmModal
+        open={confirmClose}
+        onClose={() => setConfirmClose(false)}
+        title="למחוק את הקבוצה?"
+        description="כל החברים יוצאו והקבוצה לא תהיה זמינה. פעולה זו לא ניתנת לביטול."
+        confirmLabel="מחק קבוצה"
+        variant="danger"
+        loading={actionLoading}
+        onConfirm={handleClose}
+        titleId="confirm-close-title"
+      />
     </div>
   );
 }

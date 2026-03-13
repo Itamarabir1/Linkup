@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { MessageCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useGroup } from '../context/GroupContext';
 import { api, openChatByBooking } from '../api/client';
 import type { Ride } from '../types/api';
-import { formatDateTimeNoSeconds } from '../utils/date';
+import { formatRideDate } from '../utils/date';
+import ConfirmModal from '../components/ConfirmModal/ConfirmModal';
 import styles from './MyBookings.module.css';
 
 interface BookingRow {
@@ -45,8 +48,21 @@ interface DriverBookingItem {
 
 type TabKind = 'driver' | 'passenger';
 
+const AVATAR_COLORS = ['#6366f1', '#059669', '#d97706', '#dc2626', '#7c3aed', '#0ea5e9'];
+
+function getSource(ride: Ride, myGroups: { group_id: string; name: string }[]): string {
+  if (!ride.group_id) return 'ציבורי';
+  const g = myGroups.find((x) => x.group_id === ride.group_id);
+  return g?.name ?? 'ציבורי';
+}
+
+function avatarInitial(name: string): string {
+  return (name || 'נ').charAt(0).toUpperCase();
+}
+
 export default function MyBookings() {
   const { user } = useAuth();
+  const { myGroups } = useGroup();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabKind>('passenger');
   const [passengerList, setPassengerList] = useState<PassengerBookingItem[]>([]);
@@ -57,7 +73,7 @@ export default function MyBookings() {
   const [chatLoading, setChatLoading] = useState<string | null>(null);
   const [bookingToCancel, setBookingToCancel] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
-  const [selectedPassenger, setSelectedPassenger] = useState<PassengerInRide | null>(null);
+  const [actionBookingId, setActionBookingId] = useState<string | null>(null);
 
   const fetchPassengerBookings = useCallback(async () => {
     if (!user?.user_id) return;
@@ -181,6 +197,38 @@ export default function MyBookings() {
     }
   };
 
+  const handleApprove = async (bookingId: string) => {
+    if (!user?.user_id) return;
+    setActionBookingId(bookingId);
+    setError('');
+    try {
+      await api.patch(`/bookings/${bookingId}/approve`, {}, { params: { driver_id: user.user_id } });
+      await fetchDriverBookings();
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'אישור הבקשה נכשל';
+      setError(typeof msg === 'string' ? msg : String(msg));
+    } finally {
+      setActionBookingId(null);
+    }
+  };
+
+  const handleReject = async (bookingId: string) => {
+    if (!user?.user_id) return;
+    setActionBookingId(bookingId);
+    setError('');
+    try {
+      await api.patch(`/bookings/${bookingId}/reject`, {}, { params: { driver_id: user.user_id } });
+      await fetchDriverBookings();
+    } catch (err: unknown) {
+      const msg =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'דחיית הבקשה נכשלה';
+      setError(typeof msg === 'string' ? msg : String(msg));
+    } finally {
+      setActionBookingId(null);
+    }
+  };
+
   const statusLabel: Record<string, string> = {
     pending_approval: 'ממתין לאישור',
     confirmed: 'אושר',
@@ -190,29 +238,24 @@ export default function MyBookings() {
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.pageTitle}>הזמנות שלי</h1>
-      <p className={styles.pageMeta} style={{ color: '#6b7280', marginBottom: '1rem' }}>
-        כל הבוקינגים – נסיעות שאישרת (כנהג) או שאושרו לך (כנוסע).
-      </p>
-
       <div role="tablist" className={styles.pageTabs}>
         <button
           type="button"
           role="tab"
           aria-selected={activeTab === 'passenger'}
-          className={activeTab === 'passenger' ? `${styles.btn} ${styles.btnPrimary}` : `${styles.btn} ${styles.btnOutline}`}
+          className={activeTab === 'passenger' ? styles.tabActive : styles.tab}
           onClick={() => setActiveTab('passenger')}
         >
-          נוסע
+          אני נוסע
         </button>
         <button
           type="button"
           role="tab"
           aria-selected={activeTab === 'driver'}
-          className={activeTab === 'driver' ? `${styles.btn} ${styles.btnPrimary}` : `${styles.btn} ${styles.btnOutline}`}
+          className={activeTab === 'driver' ? styles.tabActive : styles.tab}
           onClick={() => setActiveTab('driver')}
         >
-          נהג
+          אני נהג
         </button>
       </div>
 
@@ -226,32 +269,31 @@ export default function MyBookings() {
             <p className={styles.emptyText}>אין הזמנות כנוסע. חפש טרמפ ובקש להצטרף.</p>
           ) : (
             passengerList.map(({ ride, bookingId, bookingStatus, driverName }) => (
-              <div key={bookingId} className={`${styles.card} ${styles.cardRide} ${styles.cardRideWrap}`}>
+              <div key={bookingId} className={styles.bookingCard}>
                 <div className={styles.cardRoute}>
-                  {ride.origin_name ?? '?'} → {ride.destination_name ?? '?'}
+                  {ride.destination_name ?? '?'} ← {ride.origin_name ?? '?'}
                 </div>
                 <div className={styles.cardMeta}>
-                  {formatDateTimeNoSeconds(ride.departure_time)} · {ride.available_seats} מושבים ·{' '}
-                  {statusLabel[bookingStatus] ?? bookingStatus}
+                  {formatRideDate(ride.departure_time)} · {statusLabel[bookingStatus] ?? bookingStatus}
                 </div>
                 {driverName && <div className={styles.cardMeta}>נהג: {driverName}</div>}
+                <div className={styles.cardMeta}>{getSource(ride, myGroups)}</div>
                 {(bookingStatus === 'pending_approval' || bookingStatus === 'confirmed') && (
-                  <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #e5e7eb', display: 'grid', gap: '0.5rem' }}>
+                  <div className={styles.bookingCardActions}>
                     <button
                       type="button"
-                      className={`${styles.btn} ${styles.btnOutline}`}
+                      className={styles.btnOutline}
                       onClick={() => handleOpenChat(bookingId)}
                       disabled={chatLoading === bookingId}
-                      style={{ width: '100%' }}
                     >
-                      {chatLoading === bookingId ? 'פותח שיחה...' : '💬 שיחה עם הנהג'}
+                      <MessageCircle size={14} />
+                      שיחה עם הנהג
                     </button>
                     <button
                       type="button"
-                      className={`${styles.btn} ${styles.btnDanger}`}
+                      className={styles.btnDanger}
                       onClick={() => setBookingToCancel(bookingId)}
                       disabled={cancelling}
-                      style={{ width: '100%' }}
                     >
                       בטל הזמנה
                     </button>
@@ -270,199 +312,123 @@ export default function MyBookings() {
           ) : driverList.length === 0 ? (
             <p className={styles.emptyText}>אין הזמנות שאישרת. נוסעים שאישרת יופיעו כאן.</p>
           ) : (
-            driverList.map(({ ride, passengers }) => (
-              <div key={ride.ride_id} className={`${styles.card} ${styles.cardRide} ${styles.cardRideWrap}`}>
-                {/* פרטי הנסיעה - פעם אחת */}
-                <div className={styles.cardRoute}>
-                  {ride.origin_name ?? '?'} → {ride.destination_name ?? '?'}
-                </div>
-                <div className={styles.cardMeta}>
-                  {formatDateTimeNoSeconds(ride.departure_time)} · {ride.available_seats} מושבים
-                </div>
-                {ride.route_summary && (
-                  <div className={`${styles.cardMeta} ${styles.cardRouteSummary}`}>
-                    כביש מרכזי: {ride.route_summary}
-                  </div>
-                )}
-                
-                {/* רשימת הנוסעים */}
-                {passengers.length > 0 && (
-                  <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #e5e7eb' }}>
-                    <div style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>
-                      נוסעים:
+            driverList.map(({ ride, passengers }) => {
+              const pendingCount = passengers.filter((p) => p.status === 'pending_approval').length;
+              const confirmedCount = passengers.filter((p) => p.status === 'confirmed').length;
+              return (
+                <div key={ride.ride_id} className={styles.driverBlock}>
+                  <div className={styles.driverBlockHeader}>
+                    <div className={styles.cardRoute}>
+                      {ride.destination_name ?? '?'} ← {ride.origin_name ?? '?'}
                     </div>
-                    {passengers.map((passenger, index) => (
-                      <div
-                        key={passenger.bookingId}
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '0.75rem 0',
-                          borderBottom: index < passengers.length - 1 ? '1px solid #f3f4f6' : 'none',
-                        }}
-                      >
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 500, marginBottom: '0.25rem' }}>
-                            {passenger.passengerName}
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
-                            {passenger.numSeats} מושב{passenger.numSeats > 1 ? 'ים' : ''} · {statusLabel[passenger.status] ?? passenger.status}
-                          </div>
-                          {passenger.pickupName && (
-                            <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: '0.25rem' }}>
-                              תחנת עלייה: {passenger.pickupName}
-                            </div>
-                          )}
-                          {passenger.pickupTime && (
-                            <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                              שעת עלייה: {formatDateTimeNoSeconds(passenger.pickupTime)}
-                            </div>
-                          )}
+                    <div className={styles.cardMeta}>
+                      {formatRideDate(ride.departure_time)} · {ride.available_seats} מושבים
+                    </div>
+                    <div className={styles.driverBlockCounts}>
+                      {pendingCount > 0 && <span>{pendingCount} בקשות</span>}
+                      {confirmedCount > 0 && (
+                        <span className={pendingCount > 0 ? styles.countSep : ''}>
+                          {confirmedCount} מאושרים
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <ul className={styles.passengerList}>
+                    {passengers.map((passenger) => (
+                      <li key={passenger.bookingId} className={styles.passengerRow}>
+                        <div
+                          className={styles.passengerAvatar}
+                          style={{
+                            backgroundColor: AVATAR_COLORS[
+                              Math.abs(passenger.passengerName.length) % AVATAR_COLORS.length
+                            ],
+                          }}
+                        >
+                          {avatarInitial(passenger.passengerName)}
                         </div>
-                        {(passenger.status === 'pending_approval' || passenger.status === 'confirmed') && (
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        <div className={styles.passengerInfo}>
+                          <div className={styles.passengerName}>{passenger.passengerName}</div>
+                          <div className={styles.passengerMeta}>
+                            {passenger.numSeats} מושב{passenger.numSeats > 1 ? 'ים' : ''}
+                            {passenger.pickupName && ` · ${passenger.pickupName}`}
+                          </div>
+                        </div>
+                        <div className={styles.passengerActions}>
+                          {passenger.status === 'pending_approval' && (
+                            <>
+                              <button
+                                type="button"
+                                className={styles.btnApprove}
+                                onClick={() => handleApprove(passenger.bookingId)}
+                                disabled={actionBookingId === passenger.bookingId}
+                              >
+                                אזור
+                              </button>
+                              <button
+                                type="button"
+                                className={styles.btnReject}
+                                onClick={() => handleReject(passenger.bookingId)}
+                                disabled={actionBookingId === passenger.bookingId}
+                              >
+                                דחה
+                              </button>
+                            </>
+                          )}
+                          {passenger.status === 'confirmed' && (
+                            <span className={styles.statusConfirmed}>מאושר</span>
+                          )}
+                          {passenger.status === 'rejected' && (
+                            <span className={styles.statusRejected}>נדחה</span>
+                          )}
+                          {(passenger.status === 'pending_approval' || passenger.status === 'confirmed') && (
                             <button
                               type="button"
-                              className={`${styles.btn} ${styles.btnOutline}`}
-                              onClick={() => setSelectedPassenger(passenger)}
-                              style={{ fontSize: '0.875rem', padding: '0.375rem 0.75rem' }}
-                            >
-                              פרטי נוסע
-                            </button>
-                            <button
-                              type="button"
-                              className={`${styles.btn} ${styles.btnOutline}`}
+                              className={styles.btnChat}
                               onClick={() => handleOpenChat(passenger.bookingId)}
                               disabled={chatLoading === passenger.bookingId}
-                              style={{ fontSize: '0.875rem', padding: '0.375rem 0.75rem' }}
+                              title="שיחה"
                             >
-                              {chatLoading === passenger.bookingId ? '...' : '💬 שיחה'}
+                              <MessageCircle size={14} />
                             </button>
-                          </div>
-                        )}
-                      </div>
+                          )}
+                        </div>
+                      </li>
                     ))}
-                  </div>
-                )}
-              </div>
-            ))
+                  </ul>
+                </div>
+              );
+            })
           )}
         </div>
       )}
 
-      {bookingToCancel != null && (
-        <div
-          className={styles.confirmModalBackdrop}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="confirm-cancel-booking-title"
-          onClick={() => (!cancelling ? setBookingToCancel(null) : null)}
-        >
-          <div
-            className={styles.confirmModalBox}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="confirm-cancel-booking-title" className={styles.confirmModalTitle}>
-              האם אתה בטוח שאתה רוצה לבטל את ההזמנה הזו?
-            </h2>
-            <div className={styles.confirmModalActions}>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnOutline}`}
-                onClick={() => setBookingToCancel(null)}
-                disabled={cancelling}
-              >
-                ביטול
-              </button>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnDanger}`}
-                onClick={async () => {
-                  if (bookingToCancel == null) return;
-                  setCancelling(true);
-                  setError('');
-                  try {
-                    await api.post(`/bookings/${bookingToCancel}/cancel`);
-                    setBookingToCancel(null);
-                    await fetchPassengerBookings();
-                  } catch (err: unknown) {
-                    const msg =
-                      (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-                      'ביטול ההזמנה נכשל';
-                    setError(typeof msg === 'string' ? msg : String(msg));
-                  } finally {
-                    setCancelling(false);
-                  }
-                }}
-                disabled={cancelling}
-              >
-                {cancelling ? 'מבטל...' : 'אישור'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmModal
+        open={bookingToCancel != null}
+        onClose={() => setBookingToCancel(null)}
+        title="האם אתה בטוח שאתה רוצה לבטל את ההזמנה הזו?"
+        confirmLabel="אישור"
+        variant="danger"
+        loading={cancelling}
+        onConfirm={async () => {
+          if (bookingToCancel == null) return;
+          setCancelling(true);
+          setError('');
+          try {
+            await api.post(`/bookings/${bookingToCancel}/cancel`);
+            setBookingToCancel(null);
+            await fetchPassengerBookings();
+          } catch (err: unknown) {
+            const msg =
+              (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
+              'ביטול ההזמנה נכשל';
+            setError(typeof msg === 'string' ? msg : String(msg));
+          } finally {
+            setCancelling(false);
+          }
+        }}
+        titleId="confirm-cancel-booking-title"
+      />
 
-      {selectedPassenger && (
-        <div
-          className={styles.confirmModalBackdrop}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="passenger-details-title"
-          onClick={() => setSelectedPassenger(null)}
-        >
-          <div
-            className={styles.confirmModalBox}
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '500px' }}
-          >
-            <h2 id="passenger-details-title" className={styles.confirmModalTitle}>
-              פרטי נוסע
-            </h2>
-            <div style={{ padding: '1rem 0' }}>
-              <div style={{ marginBottom: '1rem' }}>
-                <div style={{ fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>שם:</div>
-                <div style={{ color: '#6b7280' }}>{selectedPassenger.passengerName}</div>
-              </div>
-              <div style={{ marginBottom: '1rem' }}>
-                <div style={{ fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>מספר מושבים:</div>
-                <div style={{ color: '#6b7280' }}>{selectedPassenger.numSeats} מושב{selectedPassenger.numSeats > 1 ? 'ים' : ''}</div>
-              </div>
-              {selectedPassenger.pickupName && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <div style={{ fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>תחנת עלייה:</div>
-                  <div style={{ color: '#6b7280' }}>{selectedPassenger.pickupName}</div>
-                </div>
-              )}
-              {selectedPassenger.pickupTime && (
-                <div style={{ marginBottom: '1rem' }}>
-                  <div style={{ fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>שעת עלייה:</div>
-                  <div style={{ color: '#6b7280' }}>{formatDateTimeNoSeconds(selectedPassenger.pickupTime)}</div>
-                </div>
-              )}
-              <div style={{ marginBottom: '1rem' }}>
-                <div style={{ fontWeight: 600, marginBottom: '0.5rem', color: '#374151' }}>סטטוס:</div>
-                <div style={{ color: '#6b7280' }}>
-                  {statusLabel[selectedPassenger.status] ?? selectedPassenger.status}
-                </div>
-              </div>
-            </div>
-            <div className={styles.confirmModalActions}>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnPrimary}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedPassenger(null);
-                }}
-              >
-                סגור
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

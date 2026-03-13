@@ -10,6 +10,7 @@ export default function CreateGroup() {
   const [error, setError] = useState('');
   const [createdGroup, setCreatedGroup] = useState<{ inviteCode: string; name: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,11 +34,17 @@ export default function CreateGroup() {
       ? `${window.location.origin}/join/${createdGroup.inviteCode}`
       : '';
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!inviteUrl) return;
-    navigator.clipboard.writeText(inviteUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopyError(null);
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      const message = (err as Error)?.message || 'העתקה נכשלה. נסה שוב.';
+      setCopyError(message);
+    }
   };
 
   if (createdGroup) {
@@ -50,12 +57,13 @@ export default function CreateGroup() {
             <input type="text" className={styles.inviteInput} value={inviteUrl} readOnly />
             <button
               type="button"
-              className={`${styles.btn} ${styles.btnPrimary} ${copied ? styles.btnPrimaryCopied : ''}`}
+              className={`${styles.btn} ${styles.btnPrimary} ${styles.btnCopy} ${copied ? styles.btnCopySuccess : ''}`}
               onClick={handleCopy}
             >
-              העתק
+              {copied ? '✓ הועתק!' : 'העתק'}
             </button>
           </div>
+          {copyError && <p className={styles.inviteError}>{copyError}</p>}
         </div>
       </div>
     );

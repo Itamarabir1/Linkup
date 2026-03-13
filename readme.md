@@ -1,6 +1,4 @@
 # Linkup — Ride-Sharing Platform
-# Linkup — Ride-Sharing Platform
-
 
 A full-stack ride-sharing application where drivers post rides, passengers search and book, and real-time chat with AI-powered conversation summaries keeps everyone in sync.
 

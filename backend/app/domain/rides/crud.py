@@ -111,6 +111,21 @@ class CRUDRide:
         result = await db.execute(stmt)
         return list(result.scalars().all())
 
+    async def get_by_group_id(
+        self,
+        db: AsyncSession,
+        group_id: UUID,
+        exclude_cancelled: bool = True,
+    ) -> List[Ride]:
+        """שליפת נסיעות לפי קבוצה (לטאב נסיעות במסך קבוצה)."""
+        gid = UUID(str(group_id)) if isinstance(group_id, str) else group_id
+        stmt = select(Ride).where(Ride.group_id == gid)
+        if exclude_cancelled:
+            stmt = stmt.where(Ride.status != RideStatus.CANCELLED)
+        stmt = stmt.order_by(Ride.departure_time.desc())
+        result = await db.execute(stmt)
+        return list(result.scalars().all())
+
     def update_status(
         self, db: Session, ride_id: UUID, status: RideStatus
     ) -> Optional[Ride]:

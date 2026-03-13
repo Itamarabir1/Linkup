@@ -1,5 +1,4 @@
 import uuid
-from datetime import datetime
 
 from sqlalchemy import Column, String, Boolean, Integer, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.sql import func
@@ -20,6 +19,10 @@ class Group(Base):
     max_members = Column(Integer, nullable=True)
     invite_expires_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # תמונת קבוצה — מפתח S3, למשל GROUPS/<group_id>/image.webp
+    avatar_key = Column(String(255), nullable=True)
+    # תיאור קבוצה — עד 500 תווים, רק מנהל עורך
+    description = Column(String(500), nullable=True)
 
     admin = relationship("User", back_populates="owned_groups", foreign_keys=[admin_id])
     members = relationship("GroupMember", back_populates="group", cascade="all, delete-orphan")
@@ -37,11 +40,12 @@ class GroupMember(Base):
     role = Column(String(20), default="member", nullable=False)
     joined_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    __table_args__ = (UniqueConstraint("group_id", "user_id", name="uq_group_member"),)
+    __table_args__ = (
+        UniqueConstraint("group_id", "user_id", name="uq_group_member"),
+    )
 
     group = relationship("Group", back_populates="members")
     user = relationship("User", back_populates="group_memberships")
 
-    __table_args__ = (
-        UniqueConstraint("group_id", "user_id", name="uq_group_member"),
-    )
+    def __repr__(self):
+        return f"<GroupMember(id={self.id}, group_id={self.group_id}, user_id={self.user_id}, role='{self.role}')>"

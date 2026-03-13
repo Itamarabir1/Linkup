@@ -1,27 +1,53 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { Search } from 'lucide-react';
 import { api } from '../api/client';
 import type { PassengerRequest } from '../types/api';
-import { formatDateTimeNoSeconds } from '../utils/date';
+import { formatRideDate } from '../utils/date';
+import { useGroup } from '../context/GroupContext';
+import Chips, { type ChipItem } from '../components/Chips/Chips';
+import RideCard from '../components/RideCard/RideCard';
+import ConfirmModal from '../components/ConfirmModal/ConfirmModal';
 import styles from './MyRequests.module.css';
 
 const statusLabels: Record<string, string> = {
-  active: 'מחפש נסיעות',
+  active: 'מחפש',
   pending: 'ממתין לאישור',
   approved: 'אושר',
   rejected: 'נדחה',
   completed: 'הושלם',
   expired: 'פג תוקף',
-  matched: 'התאמה נמצאה',
+  matched: 'נמצאה נסיעה',
   cancelled: 'בוטל',
 };
 
 export default function MyRequests() {
+  const navigate = useNavigate();
+  const { myGroups } = useGroup();
   const [requests, setRequests] = useState<PassengerRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [activeChip, setActiveChip] = useState<string>('all');
   const [requestToCancel, setRequestToCancel] = useState<PassengerRequest | null>(null);
   const [cancelling, setCancelling] = useState(false);
+
+  const chipItems: ChipItem[] = [
+    { id: 'all', label: 'הכל' },
+    { id: 'public', label: 'ציבורי' },
+    ...myGroups.map((g) => ({ id: g.group_id, label: g.name })),
+  ];
+
+  const displayedRequests = requests.filter((r) => {
+    if (activeChip === 'all') return true;
+    if (activeChip === 'public') return !r.group_id;
+    return r.group_id === activeChip;
+  });
+
+  const getSource = (r: PassengerRequest): string => {
+    if (!r.group_id) return 'ציבורי';
+    const g = myGroups.find((x) => x.group_id === r.group_id);
+    return g?.name ?? 'ציבורי';
+  };
 
   const fetchRequests = useCallback(async () => {
     try {
@@ -29,7 +55,6 @@ export default function MyRequests() {
         '/passenger/passengers/me'
       );
       const all = Array.isArray(data) ? data : [];
-      // לא להציג בקשות שבוטלו במסך
       setRequests(all.filter((r) => r.status !== 'cancelled'));
       setError('');
     } catch (err: unknown) {
@@ -56,101 +81,82 @@ export default function MyRequests() {
 
   return (
     <div className={styles.page}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-        <h1 className={styles.pageTitle} style={{ margin: 0 }}>בקשות הטרמפ שלי</h1>
-        <Link to="/search" className={`${styles.btn} ${styles.btnSuccess}`}>
-          🔍 חפש טרמפ
-        </Link>
-      </div>
+      <Chips
+        items={chipItems}
+        activeId={activeChip}
+        onChange={setActiveChip}
+      />
       {error && <p className={styles.pageError}>{error}</p>}
-      <div className={styles.cardList}>
-        {requests.length === 0 ? (
-          <p className={styles.emptyText}>אין בקשות. חפש נסיעות ושמור בקשה.</p>
-        ) : (
-          requests.map((r) => (
-            <div key={r.request_id} className={`${styles.card} ${styles.cardRequest} ${styles.cardRideWrap}`}>
-              {r.status !== 'cancelled' && (
-                <button
-                  type="button"
-                  className={styles.cardRideDeleteBtn}
-                  onClick={() => setRequestToCancel(r)}
-                  disabled={cancelling}
-                  aria-label="הסר בקשת טרמפ"
-                  title="הסר בקשה"
-                >
-                  ✕
-                </button>
-              )}
-              <div className={styles.cardRoute}>
-                {r.pickup_name ?? '?'} ← {r.destination_name ?? '?'}
-              </div>
-              <div className={styles.cardMeta}>
-                {formatDateTimeNoSeconds(r.requested_departure_time)} ·{' '}
-                סטטוס: {statusLabels[r.status] || r.status}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
 
-      {requestToCancel && (
-        <div
-          className={styles.confirmModalBackdrop}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="confirm-cancel-request-title"
-          onClick={() => (!cancelling ? setRequestToCancel(null) : null)}
-        >
-          <div
-            className={styles.confirmModalBox}
-            onClick={(e) => e.stopPropagation()}
+      {requests.length === 0 ? (
+        <div className={styles.emptyState}>
+          <Search size={48} strokeWidth={1.5} className={styles.emptyIcon} />
+          <h2 className={styles.emptyTitle}>אין בקשות טרמפ פעילות</h2>
+          <p className={styles.emptySubtitle}>חפש טרמפ כדי להתחיל</p>
+          <button
+            type="button"
+            className={styles.btnSearch}
+            onClick={() => navigate('/search')}
           >
-            <h2 id="confirm-cancel-request-title" className={styles.confirmModalTitle}>
-              האם אתה בטוח שאתה רוצה להסיר את בקשת הטרמפ הזו?
-            </h2>
-            <p style={{ color: '#6b7280', marginTop: 0 }}>
-              זה יבטל גם בקשות הצטרפות שנשלחו לנהגים (אם קיימות).
-            </p>
-            <div className={styles.confirmModalActions}>
+            <Search size={14} />
+            חפש טרמפ
+          </button>
+        </div>
+      ) : (
+        <div className={styles.grid}>
+          {displayedRequests.map((r) => (
+            <div key={r.request_id} className={styles.cardWrap}>
               <button
                 type="button"
-                className={`${styles.btn} ${styles.btnOutline}`}
-                onClick={() => setRequestToCancel(null)}
-                disabled={cancelling}
+                className={styles.cardDeleteBtn}
+                onClick={() => setRequestToCancel(r)}
+                aria-label="הסר בקשת טרמפ"
+                title="הסר בקשה"
               >
-                ביטול
+                ×
               </button>
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnDanger}`}
-                onClick={async () => {
-                  if (!requestToCancel) return;
-                  setCancelling(true);
-                  setError('');
-                  try {
-                    await api.delete(`/passenger/passengers/${requestToCancel.request_id}/cancel`);
-                    // להסיר מהרשימה אחרי ביטול
-                    setRequests((prev) =>
-                      prev.filter((p) => p.request_id !== requestToCancel.request_id)
-                    );
-                    setRequestToCancel(null);
-                  } catch (err: unknown) {
-                    const msg =
-                      (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-                      'ביטול הבקשה נכשל';
-                    setError(typeof msg === 'string' ? msg : String(msg));
-                  } finally {
-                    setCancelling(false);
-                  }
-                }}
-                disabled={cancelling}
-              >
-                {cancelling ? 'מבטל...' : 'אישור'}
-              </button>
+              <RideCard
+                route={`${r.destination_name ?? '?'} ← ${r.pickup_name ?? '?'}`}
+                time={formatRideDate(r.requested_departure_time)}
+                status={statusLabels[r.status] || r.status}
+                source={getSource(r)}
+              />
             </div>
-          </div>
+          ))}
         </div>
       )}
+
+      <ConfirmModal
+        open={requestToCancel != null}
+        onClose={() => setRequestToCancel(null)}
+        title="האם אתה בטוח שאתה רוצה להסיר את בקשת הטרמפ הזו?"
+        description="זה יבטל גם בקשות הצטרפות שנשלחו לנהגים (אם קיימות)."
+        confirmLabel="אישור"
+        variant="danger"
+        loading={cancelling}
+        onConfirm={async () => {
+          if (!requestToCancel) return;
+          setCancelling(true);
+          setError('');
+          try {
+            await api.delete(
+              `/passenger/passengers/${requestToCancel.request_id}/cancel`
+            );
+            setRequests((prev) =>
+              prev.filter((p) => p.request_id !== requestToCancel.request_id)
+            );
+            setRequestToCancel(null);
+          } catch (err: unknown) {
+            const msg =
+              (err as { response?: { data?: { detail?: string } } })
+                ?.response?.data?.detail || 'ביטול הבקשה נכשל';
+            setError(typeof msg === 'string' ? msg : String(msg));
+          } finally {
+            setCancelling(false);
+          }
+        }}
+        titleId="confirm-cancel-request-title"
+      />
     </div>
   );
 }
