@@ -94,6 +94,17 @@ export interface Booking {
   phone?: string | null;
 }
 
+/** סוגי התראות לתצוגה ולמיפוי מהבקאנד. */
+export type NotificationType =
+  | 'booking_approved'
+  | 'booking_rejected'
+  | 'ride_cancelled'
+  | 'booking_request'
+  | 'booking_cancelled_by_passenger'
+  | 'group_joined'
+  | 'group_member_joined'
+  | 'pending_approval';
+
 export interface NotificationItem {
   type: string;
   title: string;
@@ -105,6 +116,10 @@ export interface NotificationItem {
   ride_origin: string | null;
   ride_destination: string | null;
   status: string | null;
+  /** אופציונלי — כשהבקאנד יחזיר; לסמן כנקרא. */
+  id?: string;
+  is_read?: boolean;
+  action_url?: string;
 }
 
 export interface Group {

@@ -5,7 +5,6 @@ import styles from './RouteMapModal.module.css';
 
 declare global {
   interface Window {
-    google?: typeof google;
     __linkupMapsInit?: () => void;
   }
 }

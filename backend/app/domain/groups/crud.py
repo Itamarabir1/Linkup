@@ -8,9 +8,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.groups.model import Group, GroupMember
 
 
-async def create_group(db: AsyncSession, name: str, admin_id: UUID, max_members: Optional[int] = None) -> Group:
+async def create_group(
+    db: AsyncSession,
+    name: str,
+    admin_id: UUID,
+    max_members: Optional[int] = None,
+    description: Optional[str] = None,
+) -> Group:
     invite_code = secrets.token_urlsafe(16)
-    group = Group(name=name, invite_code=invite_code, admin_id=admin_id, max_members=max_members)
+    desc_trimmed = description[:500] if description else None
+    group = Group(
+        name=name,
+        invite_code=invite_code,
+        admin_id=admin_id,
+        max_members=max_members,
+        description=desc_trimmed,
+    )
     db.add(group)
     await db.commit()
     await db.refresh(group)

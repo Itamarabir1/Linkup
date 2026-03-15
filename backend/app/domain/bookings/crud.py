@@ -12,6 +12,7 @@ from app.domain.passengers.model import PassengerRequest
 from app.domain.rides.enum import RideStatus
 from app.domain.bookings.enum import BookingStatus
 from app.domain.passengers.enum import PassengerStatus
+from app.core.exceptions.booking import NoSeatsAvailableError
 from sqlalchemy import and_
 from sqlalchemy import select
 
@@ -186,6 +187,10 @@ class CRUDBooking:
         ride = booking.ride
         booking.status = BookingStatus.CONFIRMED
 
+        # בדיקה כפולה — בין בקשה לאישור עוברים שעות/ימים,
+        # יכול להיות שהמקום האחרון ניתן לנוסע אחר בינתיים
+        if ride.available_seats < booking.num_seats:
+            raise NoSeatsAvailableError("אין מקומות פנויים לאישור הזמנה זו")
         ride.available_seats -= booking.num_seats
         if ride.available_seats <= 0:
             ride.status = RideStatus.FULL
@@ -205,7 +210,8 @@ class CRUDBooking:
         if booking.status == BookingStatus.CONFIRMED:
             ride = booking.ride
             ride.available_seats += booking.num_seats
-            ride.status = RideStatus.OPEN
+            if ride.status != RideStatus.CANCELLED:
+                ride.status = RideStatus.OPEN
 
         booking.status = BookingStatus.CANCELLED
 

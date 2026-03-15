@@ -17,6 +17,7 @@ def _group_avatar_url(avatar_key: Optional[str]) -> Optional[str]:
 class GroupCreate(BaseModel):
     name: str
     max_members: Optional[int] = None
+    description: Optional[str] = None  # עד 500 תווים
 
 
 class GroupUpdate(BaseModel):

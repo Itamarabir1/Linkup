@@ -1,16 +1,26 @@
-import { useState } from 'react';
-import { createGroup } from '../api/groups';
+import { useState, useRef } from 'react';
+import {
+  createGroup,
+  getGroupImageUploadUrl,
+  confirmGroupImage,
+} from '../api/groups';
 import { useGroup } from '../context/GroupContext';
 import styles from './CreateGroup.module.css';
+
+const DESCRIPTION_MAX = 500;
 
 export default function CreateGroup() {
   const { refreshGroups } = useGroup();
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [createdGroup, setCreatedGroup] = useState<{ inviteCode: string; name: string } | null>(null);
+  const [imageError, setImageError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,8 +28,26 @@ export default function CreateGroup() {
     if (!trimmed) return;
     setSubmitting(true);
     setError('');
+    setImageError(null);
     try {
-      const group = await createGroup(trimmed);
+      const group = await createGroup({
+        name: trimmed,
+        description: description.trim().slice(0, DESCRIPTION_MAX) || undefined,
+      });
+      if (imageFile && group.group_id) {
+        try {
+          const { upload_url, key } = await getGroupImageUploadUrl(group.group_id);
+          const putRes = await fetch(upload_url, {
+            method: 'PUT',
+            body: imageFile,
+            headers: { 'Content-Type': 'image/webp' },
+          });
+          if (!putRes.ok) throw new Error('Upload failed');
+          await confirmGroupImage(group.group_id, key);
+        } catch (imgErr) {
+          setImageError('הקבוצה נוצרה, אך העלאת התמונה נכשלה. ניתן לעדכן תמונה בהגדרות הקבוצה.');
+        }
+      }
       setCreatedGroup({ inviteCode: group.invite_code, name: group.name });
       await refreshGroups();
     } catch {
@@ -51,6 +79,11 @@ export default function CreateGroup() {
     return (
       <div className={styles.page}>
         <h1 className={styles.pageTitle}>הקבוצה נוצרה</h1>
+        {imageError && (
+          <p className={styles.imageWarn} role="alert">
+            {imageError}
+          </p>
+        )}
         <div className={styles.successSection}>
           <div className={styles.successTitle}>הזמן חברים עם הקישור:</div>
           <div className={styles.inviteRow}>
@@ -86,6 +119,29 @@ export default function CreateGroup() {
           placeholder="למשל: נסיעות לתל אביב"
           required
         />
+        <label className={styles.label} htmlFor="group-desc">
+          תיאור (אופציונלי, עד {DESCRIPTION_MAX} תווים)
+        </label>
+        <textarea
+          id="group-desc"
+          className={styles.textarea}
+          value={description}
+          onChange={(e) => setDescription(e.target.value.slice(0, DESCRIPTION_MAX))}
+          placeholder="תיאור קצר של הקבוצה"
+          rows={3}
+        />
+        <span className={styles.charCount}>{description.length}/{DESCRIPTION_MAX}</span>
+        <label className={styles.label}>תמונת קבוצה (אופציונלי)</label>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className={styles.fileInput}
+          onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+        />
+        {imageFile && (
+          <p className={styles.fileName}>{imageFile.name}</p>
+        )}
         <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`} disabled={submitting}>
           {submitting ? 'יוצר...' : 'צור קבוצה'}
         </button>

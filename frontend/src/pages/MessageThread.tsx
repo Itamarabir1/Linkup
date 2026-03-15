@@ -15,8 +15,16 @@ import styles from './MessageThread.module.css';
 const TYPING_THROTTLE_MS = 4000;
 const TYPING_DISPLAY_TIMEOUT_MS = 5000;
 
-export default function MessageThread() {
-  const { conversationId } = useParams<{ conversationId: string }>();
+export interface MessageThreadProps {
+  /** כשמועבר — משמש במקום useParams (להטמעה בפנל). */
+  conversationId?: string;
+  /** true = פנל ימני: בלי כפתור חזרה, layout ממלא את המכל. */
+  embedded?: boolean;
+}
+
+export default function MessageThread({ conversationId: propConversationId, embedded }: MessageThreadProps = {}) {
+  const { conversationId: paramId } = useParams<{ conversationId: string }>();
+  const conversationId = propConversationId ?? paramId ?? '';
   const { user } = useAuth();
   const [conversation, setConversation] = useState<ConversationDetail | null>(null);
   const [messages, setMessages] = useState<MessageResponse[]>([]);
@@ -31,7 +39,7 @@ export default function MessageThread() {
   const lastTypingSentRef = useRef<number>(0);
   const typingHideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const cid = conversationId ?? '';
+  const cid = conversationId;
 
   const fetchConversation = useCallback(async () => {
     if (!cid || !user?.user_id) return;
@@ -88,8 +96,8 @@ export default function MessageThread() {
           }, TYPING_DISPLAY_TIMEOUT_MS);
           return;
         }
-        if (typeof (data as MessageResponse).message_id === 'number') {
-          const msg = data as MessageResponse;
+        if (typeof (data as unknown as MessageResponse).message_id === 'number') {
+          const msg = data as unknown as MessageResponse;
           setMessages((prev) => [...prev, msg]);
           if (msg.sender_id !== user?.user_id) setPartnerTyping(false);
         }
@@ -148,7 +156,7 @@ export default function MessageThread() {
 
   if (loading) {
     return (
-      <div className={styles.page}>
+      <div className={embedded ? styles.embeddedWrap : styles.page}>
         <p className="page-loading">טוען שיחה...</p>
       </div>
     );
@@ -156,11 +164,13 @@ export default function MessageThread() {
 
   if (error && !conversation) {
     return (
-      <div className={styles.page}>
+      <div className={embedded ? styles.embeddedWrap : styles.page}>
         <p className={styles.pageError}>{error}</p>
-        <Link to="/messages" className={`${styles.btn} ${styles.btnOutline}`} style={{ marginTop: '1rem' }}>
-          חזרה להודעות
-        </Link>
+        {!embedded && (
+          <Link to="/messages" className={`${styles.btn} ${styles.btnOutline}`} style={{ marginTop: '1rem' }}>
+            חזרה להודעות
+          </Link>
+        )}
       </div>
     );
   }
@@ -169,11 +179,16 @@ export default function MessageThread() {
   const partnerAvatarUrl = conversation?.partner?.avatar_url;
 
   return (
-    <div className={styles.page} style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <Link to="/messages" className={`${styles.btn} ${styles.btnOutline}`} style={{ fontSize: '0.875rem' }}>
-          ← הודעות
-        </Link>
+    <div
+      className={embedded ? styles.embeddedWrap : styles.page}
+      style={{ display: 'flex', flexDirection: 'column', height: embedded ? '100%' : undefined }}
+    >
+      <div style={{ marginBottom: embedded ? '0.5rem' : '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+        {!embedded && (
+          <Link to="/messages" className={`${styles.btn} ${styles.btnOutline}`} style={{ fontSize: '0.875rem' }}>
+            ← הודעות
+          </Link>
+        )}
         {partnerAvatarUrl ? (
           <img
             src={partnerAvatarUrl}
@@ -203,14 +218,15 @@ export default function MessageThread() {
       </div>
       {error && <p className={styles.pageError}>{error}</p>}
       <div
+        className={embedded ? styles.embeddedMessages : undefined}
         style={{
           flex: 1,
           overflowY: 'auto',
-          border: '1px solid #e5e7eb',
-          borderRadius: 8,
+          border: embedded ? undefined : '1px solid #e5e7eb',
+          borderRadius: embedded ? 0 : 8,
           padding: '1rem',
-          minHeight: 200,
-          maxHeight: 400,
+          minHeight: embedded ? 0 : 200,
+          maxHeight: embedded ? 'none' : 400,
           display: 'flex',
           flexDirection: 'column',
           gap: '0.5rem',

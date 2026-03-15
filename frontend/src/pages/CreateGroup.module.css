@@ -34,6 +34,31 @@
   text-align: right;
 }
 
+.textarea {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 1rem;
+  text-align: right;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.charCount {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+.fileInput {
+  font-size: 0.9rem;
+}
+
+.fileName {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin: 0;
+}
+
 .btn {
   display: inline-block;
   padding: 0.6rem 1.2rem;
@@ -77,6 +102,16 @@
 
 .btnCopySuccess:hover {
   background: #15803d;
+}
+
+.imageWarn {
+  margin: 0 0 1rem 0;
+  padding: 0.75rem 1rem;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #92400e;
 }
 
 .successSection {

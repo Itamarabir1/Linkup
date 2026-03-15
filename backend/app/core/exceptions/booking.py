@@ -57,6 +57,17 @@ class BookingNotFoundError(LinkupError):
         super().__init__(payload=payload)
 
 
+class NoSeatsAvailableError(LinkupError):
+    """אין מקומות פנויים בנסיעה — בבקשה או באישור."""
+
+    status_code = 409
+    error_code = "NO_SEATS_AVAILABLE"
+    message = "אין מקומות פנויים בנסיעה זו"
+
+    def __init__(self, message: str = "אין מקומות פנויים בנסיעה זו"):
+        super().__init__(message=message)
+
+
 class ForbiddenRideActionError(LinkupError):
     """אין הרשאה לבצע פעולה על נסיעה/הזמנה זו."""
 

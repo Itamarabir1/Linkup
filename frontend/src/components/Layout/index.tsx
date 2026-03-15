@@ -1,38 +1,23 @@
-import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
-import { useEffect, useState, useRef } from 'react';
+import { Outlet, NavLink, Link, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
 import { MessageCircle, Bell, User, Search, Plus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { api } from '../../api/client';
-import type { NotificationItem } from '../../types/api';
+import { useChat } from '../../context/ChatContext';
+import ChatPopup from '../ChatPopup/ChatPopup';
 import styles from './Layout.module.css';
 
 export default function Layout() {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
+  const { unreadMessages, unreadNotifications, openConversationId } = useChat();
   const navigate = useNavigate();
-  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+  const location = useLocation();
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!user?.user_id) {
-      setUnreadNotificationsCount(0);
-      return;
-    }
-    const fetchUnreadCount = async () => {
-      try {
-        const { data } = await api.get<NotificationItem[]>('/users/me/notifications');
-        const now = new Date();
-        const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-        const count = data.filter((n) => new Date(n.created_at) >= yesterday).length;
-        setUnreadNotificationsCount(count);
-      } catch {
-        // ignore
-      }
-    };
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 60000);
-    return () => clearInterval(interval);
-  }, [user?.user_id]);
+  const showChatPopup = openConversationId && location.pathname !== '/messages';
+
+  const messagesBadge = unreadMessages > 0 ? (unreadMessages >= 10 ? '9+' : String(unreadMessages)) : null;
+  const notificationsBadge = unreadNotifications > 0 ? (unreadNotifications >= 10 ? '9+' : String(unreadNotifications)) : null;
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -93,18 +78,23 @@ export default function Layout() {
           <div className={styles.iconBtnWrapper}>
             <Link to="/messages" className={styles.iconBtn} aria-label="הודעות">
               <MessageCircle size={16} />
-              {unreadNotificationsCount > 0 && (
-                <span className={styles.notificationDot} aria-hidden />
+              {messagesBadge && (
+                <span className={styles.badge} aria-hidden>
+                  {messagesBadge}
+                </span>
               )}
             </Link>
           </div>
-          <Link
-            to="/notifications"
-            className={styles.iconBtn}
-            aria-label="התראות"
-          >
-            <Bell size={16} />
-          </Link>
+          <div className={styles.iconBtnWrapper}>
+            <Link to="/notifications" className={styles.iconBtn} aria-label="התראות">
+              <Bell size={16} />
+              {notificationsBadge && (
+                <span className={styles.badge} aria-hidden>
+                  {notificationsBadge}
+                </span>
+              )}
+            </Link>
+          </div>
           <div className={styles.profileWrap} ref={profileRef}>
             <button
               type="button"
@@ -150,6 +140,9 @@ export default function Layout() {
       <main className={styles.main}>
         <Outlet />
       </main>
+      {showChatPopup && openConversationId && (
+        <ChatPopup conversationId={openConversationId} />
+      )}
     </div>
   );
 }

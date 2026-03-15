@@ -134,6 +134,15 @@ export default function SearchRides() {
         setError('פג תוקף ההתחברות – אנא התחבר מחדש כדי לשלוח בקשה.');
         return;
       }
+      if (status === 409) {
+        const msg =
+          (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+          'המקום התמלא. נסה נסיעה אחרת.';
+        setRequestErrorRideId(r.ride_id);
+        setRequestErrorMessage(typeof msg === 'string' ? msg : 'המקום התמלא. נסה נסיעה אחרת.');
+        setError(typeof msg === 'string' ? msg : 'המקום התמלא. נסה נסיעה אחרת.');
+        return;
+      }
       const msg =
         (err as { response?: { data?: { message?: string; detail?: string } } })?.response?.data
           ?.message ||

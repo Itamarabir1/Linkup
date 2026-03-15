@@ -1,96 +1,218 @@
 .page {
-  padding: 1rem 1.5rem;
-  max-width: 800px;
+  max-width: 680px;
   margin: 0 auto;
+  padding: 24px 20px;
   text-align: right;
 }
 
-.pageTitle {
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
 }
 
-.pageMeta {
-  color: #6b7280;
-  margin-bottom: 1rem;
+.pageTitle {
+  font-family: "Rubik", "Heebo", sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.markAllRead {
+  font-family: "Heebo", sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--primary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.markAllRead:hover {
+  text-decoration: underline;
 }
 
 .pageError {
-  color: #dc2626;
+  color: var(--danger-text);
   margin-bottom: 1rem;
 }
 
-.pageLoading,
-.emptyText {
+.pageLoading {
   text-align: center;
-  color: #6b7280;
+  color: var(--text-secondary);
   padding: 2rem;
 }
 
-.cardList {
+.empty {
+  padding-top: 80px;
+  text-align: center;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  align-items: center;
+  gap: 12px;
 }
 
-.card {
-  background: #fff;
-  padding: 1rem 1.25rem;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  border-right: 4px solid #2563eb;
+.emptyIcon {
+  color: #d1d5db;
 }
 
-.cardRoute {
+.emptyTitle {
+  font-family: "Heebo", sans-serif;
+  font-size: 16px;
   font-weight: 600;
-  font-size: 1rem;
+  color: var(--text-primary);
+  margin: 0;
 }
 
-.cardMeta {
-  font-size: 0.9rem;
-  color: #6b7280;
-  margin-top: 0.25rem;
+.emptySub {
+  font-family: "Heebo", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin: 0;
 }
 
-.cardRouteSummary {
-  font-style: italic;
-  color: #4b5563;
-}
-
-.cardActions {
+.groups {
   display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-top: 0.75rem;
+  flex-direction: column;
 }
 
-.btn {
-  display: inline-block;
-  padding: 0.6rem 1.2rem;
-  border-radius: 8px;
-  font-size: 1rem;
+.group {
+  margin-bottom: 8px;
+}
+
+.groupTitle {
+  font-family: "Heebo", sans-serif;
+  font-size: 12px;
   font-weight: 600;
-  text-decoration: none;
-  border: none;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 16px 0 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.groupTitle:first-child {
+  margin-top: 0;
+}
+
+.notificationRow {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
   cursor: pointer;
-  text-align: center;
+  transition: background 150ms, box-shadow 150ms;
+  text-align: right;
+  font-family: inherit;
 }
 
-.btnSuccess {
-  background: #059669;
-  color: #fff;
+.notificationRow:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
-.btnSuccess:hover {
-  background: #047857;
+.notificationRow.unread {
+  background: var(--primary-light);
 }
 
-.btnOutline {
-  background: transparent;
-  color: #374151;
-  border: 1px solid #d1d5db;
+.notifIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.btnOutline:hover {
-  background: #f3f4f6;
+.icon_booking_approved {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.icon_booking_rejected {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.icon_ride_cancelled {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+
+.icon_booking_request {
+  background: var(--info-bg);
+  color: var(--info-text);
+}
+
+.icon_booking_cancelled_by_passenger {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.icon_group_joined {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+
+.icon_group_member_joined {
+  background: var(--info-bg);
+  color: var(--info-text);
+}
+
+.icon_pending_approval,
+.icon_default {
+  background: var(--info-bg);
+  color: var(--info-text);
+}
+
+.notifContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.notifTitle {
+  font-family: "Heebo", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.notifTitleUnread {
+  font-weight: 600;
+}
+
+.notifBody {
+  font-family: "Heebo", sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin: 2px 0 0;
+}
+
+.notifTime {
+  font-family: "Heebo", sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-tertiary);
+  margin: 4px 0 0;
+}
+
+.unreadDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex-shrink: 0;
+  margin-top: 4px;
 }

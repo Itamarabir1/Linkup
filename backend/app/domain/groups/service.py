@@ -7,7 +7,13 @@ from app.domain.groups.schema import GroupCreate, GroupOut
 
 
 async def create_group(db: AsyncSession, data: GroupCreate, user_id: UUID) -> GroupOut:
-    group = await crud.create_group(db, name=data.name, admin_id=user_id, max_members=data.max_members)
+    group = await crud.create_group(
+        db,
+        name=data.name,
+        admin_id=user_id,
+        max_members=data.max_members,
+        description=data.description,
+    )
     count = await crud.get_member_count(db, group.group_id)
     return GroupOut.model_validate({**group.__dict__, "member_count": count})
 

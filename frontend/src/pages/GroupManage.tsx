@@ -1,18 +1,16 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Search, Plus, Settings, MoreVertical, Crown } from 'lucide-react';
+import { Search, Plus, Settings, MoreVertical, Crown, Pencil, Camera, Check, X } from 'lucide-react';
 import {
   getGroupMembers,
   removeMember,
   promoteMember,
   leaveGroup,
   closeGroup,
-  renameGroup,
   updateGroup,
   getGroupRides,
   getGroupImageUploadUrl,
   confirmGroupImage,
-  deleteGroupImage,
 } from '../api/groups';
 import { useAuth } from '../context/AuthContext';
 import { useGroup } from '../context/GroupContext';
@@ -76,9 +74,7 @@ export default function GroupManage() {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<GroupTab>('rides');
   const [dateChip, setDateChip] = useState<string>('all');
-  const [editingName, setEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState('');
-  const [savingName, setSavingName] = useState(false);
   const [copyInviteDone, setCopyInviteDone] = useState(false);
   const [copyInviteError, setCopyInviteError] = useState<string | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -88,11 +84,12 @@ export default function GroupManage() {
   const [membersModalOpen, setMembersModalOpen] = useState(false);
   const [membersSearch, setMembersSearch] = useState('');
   const [editDescriptionValue, setEditDescriptionValue] = useState('');
-  const [savingDescription, setSavingDescription] = useState(false);
-  const [imageUploading, setImageUploading] = useState(false);
-  const [imageDeleting, setImageDeleting] = useState(false);
+  const [headerEditing, setHeaderEditing] = useState(false);
+  const [headerImageFile, setHeaderImageFile] = useState<File | null>(null);
+  const [headerPreviewUrl, setHeaderPreviewUrl] = useState<string | null>(null);
+  const [headerSaving, setHeaderSaving] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const headerFileInputRef = useRef<HTMLInputElement>(null);
 
   const group = groupId ? (myGroups.find((g) => g.group_id === groupId) ?? null) : null;
   const MEMBERS_PREVIEW = 8;
@@ -160,12 +157,64 @@ export default function GroupManage() {
   }, [activeTab, loadRides]);
 
   useEffect(() => {
-    if (group && !editingName) setEditNameValue(group.name);
-  }, [group?.name, editingName]);
+    if (group && !headerEditing) setEditNameValue(group.name);
+  }, [group?.name, headerEditing]);
 
   useEffect(() => {
     if (group) setEditDescriptionValue(group.description ?? '');
   }, [group?.description]);
+
+  const startHeaderEdit = () => {
+    if (!group) return;
+    setEditNameValue(group.name);
+    setEditDescriptionValue(group.description ?? '');
+    if (headerPreviewUrl) URL.revokeObjectURL(headerPreviewUrl);
+    setHeaderPreviewUrl(null);
+    setHeaderImageFile(null);
+    setHeaderEditing(true);
+  };
+
+  const cancelHeaderEdit = () => {
+    setHeaderEditing(false);
+    if (headerPreviewUrl) URL.revokeObjectURL(headerPreviewUrl);
+    setHeaderPreviewUrl(null);
+    setHeaderImageFile(null);
+    if (group) {
+      setEditNameValue(group.name);
+      setEditDescriptionValue(group.description ?? '');
+    }
+  };
+
+  const saveHeaderEdit = async () => {
+    const nameTrimmed = editNameValue.trim();
+    if (!nameTrimmed || !groupId) return;
+    setHeaderSaving(true);
+    setError('');
+    try {
+      await updateGroup(groupId, {
+        name: nameTrimmed,
+        description: editDescriptionValue.slice(0, 500) || undefined,
+      });
+      if (headerImageFile) {
+        const { upload_url, key } = await getGroupImageUploadUrl(groupId);
+        await fetch(upload_url, {
+          method: 'PUT',
+          body: headerImageFile,
+          headers: { 'Content-Type': 'image/webp' },
+        });
+        await confirmGroupImage(groupId, key);
+      }
+      await refreshGroups();
+      setHeaderEditing(false);
+      if (headerPreviewUrl) URL.revokeObjectURL(headerPreviewUrl);
+      setHeaderPreviewUrl(null);
+      setHeaderImageFile(null);
+    } catch {
+      setError('שמירת השינויים נכשלה');
+    } finally {
+      setHeaderSaving(false);
+    }
+  };
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -215,25 +264,6 @@ export default function GroupManage() {
     } catch (err) {
       const message = (err as Error)?.message || 'העתקה נכשלה. נסה שוב.';
       setCopyInviteError(message);
-    }
-  };
-
-  const handleSaveName = async () => {
-    const trimmed = editNameValue.trim();
-    if (!trimmed || trimmed === group.name) {
-      setEditingName(false);
-      return;
-    }
-    setSavingName(true);
-    setError('');
-    try {
-      await renameGroup(groupId, trimmed);
-      await refreshGroups();
-      setEditingName(false);
-    } catch {
-      setError('שינוי השם נכשל');
-    } finally {
-      setSavingName(false);
     }
   };
 
@@ -299,110 +329,150 @@ export default function GroupManage() {
     }
   };
 
-  const handleSaveDescription = async () => {
-    const val = editDescriptionValue.slice(0, 500);
-    setSavingDescription(true);
-    setError('');
-    try {
-      await updateGroup(groupId, { description: val || undefined });
-      await refreshGroups();
-    } catch {
-      setError('שמירת התיאור נכשלה');
-    } finally {
-      setSavingDescription(false);
-    }
-  };
-
-  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !groupId) return;
-    e.target.value = '';
-    setImageUploading(true);
-    setError('');
-    try {
-      const { upload_url, key } = await getGroupImageUploadUrl(groupId);
-      await fetch(upload_url, {
-        method: 'PUT',
-        body: file,
-        headers: { 'Content-Type': 'image/webp' },
-      });
-      await confirmGroupImage(groupId, key);
-      await refreshGroups();
-    } catch {
-      setError('העלאת התמונה נכשלה');
-    } finally {
-      setImageUploading(false);
-    }
-  };
-
-  const handleDeleteImage = async () => {
-    setImageDeleting(true);
-    setError('');
-    try {
-      await deleteGroupImage(groupId);
-      await refreshGroups();
-    } catch {
-      setError('מחיקת התמונה נכשלה');
-    } finally {
-      setImageDeleting(false);
-    }
-  };
-
   const groupAvatarColor = AVATAR_COLORS[Math.abs(group.name.length) % AVATAR_COLORS.length];
 
   return (
     <div className={styles.page}>
       <header className={styles.header}>
-        {group.avatar_url ? (
-          <img src={group.avatar_url} alt="" className={styles.headerAvatarImg} />
-        ) : (
-          <div
-            className={styles.headerAvatar}
-            style={{ backgroundColor: groupAvatarColor }}
-          >
-            {group.name.charAt(0).toUpperCase()}
-          </div>
-        )}
-        <div className={styles.headerInfo}>
-          <h1 className={styles.headerName}>{group.name}</h1>
-          <p className={styles.headerMeta}>
-            {group.member_count ?? members.length} חברים
-            {group.is_active === false && ' · לא פעילה'}
-          </p>
-          {group.description && (
-            <p className={styles.headerDescription}>{group.description}</p>
-          )}
-        </div>
-        <div className={styles.headerActions}>
-          <button
-            type="button"
-            className={styles.headerBtn}
-            onClick={() => navigate('/search')}
-            title="חפש בקבוצה"
-          >
-            <Search size={18} />
-            חפש בקבוצה
-          </button>
-          <button
-            type="button"
-            className={styles.headerBtnPrimary}
-            onClick={() => navigate('/create-ride', { state: { groupId } })}
-            title="הצע נסיעה לקבוצה"
-          >
-            <Plus size={18} />
-            הצע נסיעה לקבוצה
-          </button>
-          {isAdmin && (
+        {headerEditing ? (
+          <>
+            <input
+              ref={headerFileInputRef}
+              type="file"
+              accept="image/*"
+              className={styles.hiddenInput}
+              onChange={(e) => {
+                const file = e.target.files?.[0] ?? null;
+                if (headerPreviewUrl) URL.revokeObjectURL(headerPreviewUrl);
+                setHeaderPreviewUrl(file ? URL.createObjectURL(file) : null);
+                setHeaderImageFile(file);
+                e.target.value = '';
+              }}
+            />
             <button
               type="button"
-              className={styles.headerIconBtn}
-              onClick={() => setActiveTab('settings')}
-              title="הגדרות"
+              className={styles.headerAvatarWrap}
+              onClick={() => headerFileInputRef.current?.click()}
+              disabled={headerSaving}
             >
-              <Settings size={20} />
+              {group.avatar_url && !headerPreviewUrl ? (
+                <img src={group.avatar_url} alt="" className={styles.headerAvatarImg} />
+              ) : headerPreviewUrl ? (
+                <img src={headerPreviewUrl} alt="" className={styles.headerAvatarImg} />
+              ) : (
+                <div
+                  className={styles.headerAvatar}
+                  style={{ backgroundColor: groupAvatarColor }}
+                >
+                  {group.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span className={styles.headerAvatarOverlay}>
+                <Camera size={20} />
+              </span>
             </button>
-          )}
-        </div>
+            <div className={styles.headerInfo}>
+              <input
+                type="text"
+                className={styles.headerNameInput}
+                value={editNameValue}
+                onChange={(e) => setEditNameValue(e.target.value)}
+                disabled={headerSaving}
+              />
+              <textarea
+                className={styles.headerDescInput}
+                value={editDescriptionValue}
+                onChange={(e) => setEditDescriptionValue(e.target.value.slice(0, 500))}
+                placeholder="תיאור (אופציונלי)"
+                rows={2}
+                disabled={headerSaving}
+              />
+              <div className={styles.headerEditActions}>
+                <button
+                  type="button"
+                  className={styles.headerEditBtnCancel}
+                  onClick={cancelHeaderEdit}
+                  disabled={headerSaving}
+                >
+                  <X size={16} />
+                  ביטול
+                </button>
+                <button
+                  type="button"
+                  className={styles.headerEditBtnSave}
+                  onClick={saveHeaderEdit}
+                  disabled={headerSaving}
+                >
+                  <Check size={16} />
+                  {headerSaving ? 'שומר...' : 'שמור'}
+                </button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            {group.avatar_url ? (
+              <img src={group.avatar_url} alt="" className={styles.headerAvatarImg} />
+            ) : (
+              <div
+                className={styles.headerAvatar}
+                style={{ backgroundColor: groupAvatarColor }}
+              >
+                {group.name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className={styles.headerInfo}>
+              <h1 className={styles.headerName}>{group.name}</h1>
+              <p className={styles.headerMeta}>
+                {group.member_count ?? members.length} חברים
+                {group.is_active === false && ' · לא פעילה'}
+              </p>
+              {group.description && (
+                <p className={styles.headerDescription}>{group.description}</p>
+              )}
+            </div>
+            <div className={styles.headerActions}>
+              <button
+                type="button"
+                className={styles.headerBtn}
+                onClick={() => navigate('/search')}
+                title="חפש בקבוצה"
+              >
+                <Search size={18} />
+                חפש בקבוצה
+              </button>
+              <button
+                type="button"
+                className={styles.headerBtnPrimary}
+                onClick={() => navigate('/create-ride', { state: { groupId } })}
+                title="הצע נסיעה לקבוצה"
+              >
+                <Plus size={18} />
+                הצע נסיעה לקבוצה
+              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  className={styles.headerIconBtn}
+                  onClick={startHeaderEdit}
+                  title="ערוך פרטי קבוצה"
+                >
+                  <Pencil size={18} />
+                </button>
+              )}
+              {isAdmin && (
+                <button
+                  type="button"
+                  className={styles.headerIconBtn}
+                  onClick={() => setActiveTab('settings')}
+                  title="הגדרות"
+                >
+                  <Settings size={20} />
+                </button>
+              )}
+            </div>
+          </>
+        )}
       </header>
 
       <div role="tablist" className={styles.tabs}>
@@ -635,101 +705,9 @@ export default function GroupManage() {
 
       {activeTab === 'settings' && isAdmin && (
         <div className={styles.settingsSection}>
-          <h2 className={styles.settingsTitle}>פרטי קבוצה</h2>
-          <div className={styles.settingsNameRow}>
-            {editingName ? (
-              <>
-                <input
-                  type="text"
-                  className={styles.groupNameInput}
-                  value={editNameValue}
-                  onChange={(e) => setEditNameValue(e.target.value)}
-                  onBlur={handleSaveName}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSaveName()}
-                  disabled={savingName}
-                  autoFocus
-                />
-                {savingName && <span className={styles.savingHint}>שומר...</span>}
-              </>
-            ) : (
-              <button
-                type="button"
-                className={styles.settingsNameBtn}
-                onClick={() => setEditingName(true)}
-              >
-                {group.name}
-              </button>
-            )}
-          </div>
-
-          <div className={styles.settingsRow}>
-            <label className={styles.settingsLabel}>תיאור</label>
-            <div className={styles.settingsDescriptionWrap}>
-              <textarea
-                className={styles.settingsDescriptionInput}
-                value={editDescriptionValue}
-                onChange={(e) => setEditDescriptionValue(e.target.value.slice(0, 500))}
-                onBlur={handleSaveDescription}
-                disabled={savingDescription}
-                rows={3}
-                maxLength={500}
-                placeholder="תיאור קצר של הקבוצה (עד 500 תווים)"
-              />
-              <span className={styles.charCount}>
-                {editDescriptionValue.length}/500
-              </span>
-            </div>
-          </div>
-
-          <div className={styles.settingsRow}>
-            <label className={styles.settingsLabel}>תמונת קבוצה</label>
-            <div className={styles.settingsImageWrap}>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className={styles.hiddenInput}
-                onChange={handleImageSelect}
-              />
-              {group.avatar_url ? (
-                <>
-                  <img
-                    src={group.avatar_url}
-                    alt=""
-                    className={styles.settingsGroupImage}
-                  />
-                  <div className={styles.settingsImageActions}>
-                    <button
-                      type="button"
-                      className={styles.btnOutline}
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={imageUploading}
-                    >
-                      {imageUploading ? 'מעלה...' : 'החלף'}
-                    </button>
-                    <button
-                      type="button"
-                      className={styles.btnDanger}
-                      onClick={handleDeleteImage}
-                      disabled={imageDeleting}
-                    >
-                      {imageDeleting ? 'מוחק...' : 'הסר'}
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  className={styles.btnOutline}
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={imageUploading}
-                >
-                  {imageUploading ? 'מעלה...' : 'העלה תמונה'}
-                </button>
-              )}
-            </div>
-          </div>
-
+          <p className={styles.settingsHint}>
+            לעריכת שם, תיאור ותמונה — השתמש בכפתור העריכה (✏) בכותרת הדף.
+          </p>
           <h3 className={styles.inviteLabel}>קוד הצטרפות</h3>
           <div className={styles.inviteRow}>
             <input type="text" className={styles.inviteInput} value={inviteUrl} readOnly />

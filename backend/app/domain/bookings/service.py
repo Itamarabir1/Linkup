@@ -271,6 +271,10 @@ class BookingService:
             ride = booking.ride
             if not ride or ride.driver_id != driver_id:
                 raise ForbiddenRideActionError("גישה חסומה")
+            # נעילת שורת הנסיעה לפני האישור — מונעת race בין שני אישורים
+            ride = crud_booking.get_ride_for_update(sess, booking.ride_id)
+            if not ride:
+                raise RideNotAvailableError(ride_id=str(booking.ride_id))
             crud_booking.execute_booking_approval(sess, booking)
             sess.flush()
             return crud_booking.get_booking_by_id(sess, booking_id)
@@ -286,7 +290,7 @@ class BookingService:
             await db.commit()
             await db.refresh(booking)
             return booking
-        except (BookingNotFoundError, ForbiddenRideActionError):
+        except (BookingNotFoundError, ForbiddenRideActionError, RideNotAvailableError):
             await db.rollback()
             raise
 
@@ -337,6 +341,10 @@ class BookingService:
             is_driver = bool(ride and ride.driver_id == current_user_id)
             if not (is_passenger or is_driver):
                 raise ForbiddenRideActionError("גישה חסומה")
+            # נעילת שורת הנסיעה לפני הביטול — מונעת race בין ביטול לאישור
+            ride = crud_booking.get_ride_for_update(sess, booking.ride_id)
+            if not ride:
+                raise RideNotAvailableError(ride_id=str(booking.ride_id))
             crud_booking.execute_booking_cancellation(sess, booking)
             sess.flush()
             return crud_booking.get_booking_by_id(sess, booking_id)
@@ -346,7 +354,7 @@ class BookingService:
             await db.commit()
             await db.refresh(booking)
             return booking
-        except (BookingNotFoundError, ForbiddenRideActionError):
+        except (BookingNotFoundError, ForbiddenRideActionError, RideNotAvailableError):
             await db.rollback()
             raise
 

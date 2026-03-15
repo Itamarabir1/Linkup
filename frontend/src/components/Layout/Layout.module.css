@@ -79,15 +79,24 @@
   color: inherit;
 }
 
-.notificationDot {
+/* Badge: מספר שיחות/התראות שלא נקראו — 18px, פינה עליונה שמאלית (RTL) */
+.badge {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 7px;
-  height: 7px;
+  top: -6px;
+  left: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
   border-radius: 50%;
-  background: #ef4444;
-  border: 1px solid var(--bg-card);
+  background: var(--unread-dot, #ef4444);
+  color: white;
+  font-family: "Heebo", sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
 }
 
 .navDivider {

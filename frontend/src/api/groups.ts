@@ -2,9 +2,12 @@ import { api } from './client';
 import type { Group, GroupMember } from '../types/api';
 import type { Ride } from '../types/api';
 
-// יצירת קבוצה חדשה
-export async function createGroup(name: string): Promise<Group> {
-  const { data } = await api.post<Group>('/groups', { name });
+// יצירת קבוצה חדשה (תיאור ותמונה אופציונליים; תמונה מעלה אחרי יצירה)
+export async function createGroup(payload: {
+  name: string;
+  description?: string;
+}): Promise<Group> {
+  const { data } = await api.post<Group>('/groups', payload);
   return data;
 }
 

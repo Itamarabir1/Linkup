@@ -45,6 +45,7 @@ from .booking import (
     PassengerRequestNotFoundError,
     BookingNotFoundError,
     ForbiddenRideActionError,
+    NoSeatsAvailableError,
 )
 
 # Passenger
@@ -111,6 +112,7 @@ __all__ = [
     "PassengerRequestNotFoundError",
     "BookingNotFoundError",
     "ForbiddenRideActionError",
+    "NoSeatsAvailableError",
     "ActiveBookingExistsError",
     "InsufficientPermissionsForRide",
     "InvalidEmailError",

@@ -49,6 +49,99 @@
   flex-shrink: 0;
 }
 
+.headerAvatarWrap {
+  position: relative;
+  flex-shrink: 0;
+  border: none;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.headerAvatarWrap:hover .headerAvatarOverlay {
+  opacity: 1;
+}
+
+.headerAvatarOverlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  opacity: 0.6;
+  transition: opacity 150ms ease;
+}
+
+.headerNameInput {
+  font-family: "Rubik", "Heebo", sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 100%;
+  max-width: 280px;
+  text-align: right;
+}
+
+.headerDescInput {
+  font-family: "Heebo", sans-serif;
+  font-size: 0.9rem;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  width: 100%;
+  max-width: 360px;
+  text-align: right;
+  resize: vertical;
+  margin-top: 0.5rem;
+}
+
+.headerEditActions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.headerEditBtnSave {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.4rem 0.75rem;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.headerEditBtnSave:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.headerEditBtnCancel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.headerEditBtnCancel:hover:not(:disabled) {
+  background: var(--bg-secondary);
+}
+
 .headerInfo {
   flex: 1;
   min-width: 0;
@@ -438,6 +531,12 @@
 /* Settings tab */
 .settingsSection {
   max-width: 480px;
+}
+
+.settingsHint {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0 0 1rem 0;
 }
 
 .settingsTitle {

@@ -1,20 +1,59 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import {
+  CheckCircle,
+  XCircle,
+  AlertTriangle,
+  UserPlus,
+  UserMinus,
+  Users,
+  UserCheck,
+  Bell,
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { api, openChatByBooking } from '../api/client';
+import { useChat, getNotificationItemKey } from '../context/ChatContext';
+import { api } from '../api/client';
 import type { NotificationItem } from '../types/api';
 import { formatDateTimeNoSeconds } from '../utils/date';
 import styles from './Notifications.module.css';
 
+type DisplayType = 'booking_approved' | 'booking_rejected' | 'ride_cancelled' | 'booking_request' | 'booking_cancelled_by_passenger' | 'group_joined' | 'group_member_joined' | 'pending_approval' | 'default';
+
+/** מיפוי type מהבקאנד לסוג תצוגה (אייקון + סגנון). */
+function getDisplayType(type: string): DisplayType {
+  if (type === 'booking_confirmed') return 'booking_approved';
+  if (type === 'ride_request') return 'booking_request';
+  if (type === 'pending_approval') return 'pending_approval';
+  const known: DisplayType[] = ['booking_approved', 'booking_rejected', 'ride_cancelled', 'booking_request', 'booking_cancelled_by_passenger', 'group_joined', 'group_member_joined', 'pending_approval'];
+  return known.includes(type as DisplayType) ? (type as DisplayType) : 'default';
+}
+
+/** קבוצת זמן: היום, אתמול, השבוע, קודם לכן */
+function getTimeGroup(date: string): string {
+  const d = new Date(date);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const diffDays = Math.round((today.getTime() - dayStart.getTime()) / (24 * 60 * 60 * 1000));
+  if (diffDays === 0) return 'היום';
+  if (diffDays === 1) return 'אתמול';
+  if (diffDays >= 2 && diffDays < 7) return 'השבוע';
+  return 'קודם לכן';
+}
+
+const GROUP_ORDER = ['היום', 'אתמול', 'השבוע', 'קודם לכן'];
+
 export default function Notifications() {
   const { user } = useAuth();
-  const navigate = useNavigate();
+  const {
+    markNotificationRead,
+    markAllNotificationsRead,
+    refreshUnreadNotifications,
+    isNotificationRead,
+    unreadNotifications,
+  } = useChat();
   const [list, setList] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [actionBookingId, setActionBookingId] = useState<string | null>(null);
-  const [chatLoading, setChatLoading] = useState<string | null>(null);
-  const [showAll, setShowAll] = useState(false);
 
   const fetchNotifications = useCallback(async () => {
     if (!user?.user_id) return;
@@ -23,83 +62,33 @@ export default function Notifications() {
     try {
       const { data } = await api.get<NotificationItem[]>('/users/me/notifications');
       setList(Array.isArray(data) ? data : []);
+      refreshUnreadNotifications();
     } catch {
       setError('לא ניתן לטעון את ההתראות');
     } finally {
       setLoading(false);
     }
-  }, [user?.user_id]);
+  }, [user?.user_id, refreshUnreadNotifications]);
 
   useEffect(() => {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  const handleApprove = async (bookingId: string) => {
-    if (!user?.user_id) return;
-    setActionBookingId(bookingId);
-    setError('');
-    try {
-      await api.patch(`/bookings/${bookingId}/approve`, null, {
-        params: { driver_id: user.user_id },
-      });
-      await fetchNotifications();
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string; detail?: string } } })?.response?.data
-          ?.message ||
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-        'אישור הבקשה נכשל';
-      setError(typeof msg === 'string' ? msg : String(msg));
-    } finally {
-      setActionBookingId(null);
-    }
-  };
+  const grouped = useCallback(() => {
+    const groups: Record<string, NotificationItem[]> = {};
+    GROUP_ORDER.forEach((g) => { groups[g] = []; });
+    list.forEach((n) => {
+      const g = getTimeGroup(n.created_at);
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(n);
+    });
+    return GROUP_ORDER.filter((g) => groups[g].length > 0).map((g) => ({ label: g, items: groups[g] }));
+  }, [list]);
 
-  const handleReject = async (bookingId: string) => {
-    if (!user?.user_id) return;
-    setActionBookingId(bookingId);
-    setError('');
-    try {
-      await api.patch(`/bookings/${bookingId}/reject`, null, {
-        params: { driver_id: user.user_id },
-      });
-      await fetchNotifications();
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { message?: string; detail?: string } } })?.response?.data
-          ?.message ||
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ||
-        'דחיית הבקשה נכשלה';
-      setError(typeof msg === 'string' ? msg : String(msg));
-    } finally {
-      setActionBookingId(null);
-    }
-  };
-
-  const handleOpenChat = async (bookingId: string) => {
-    setChatLoading(bookingId);
-    setError('');
-    try {
-      const conversation = await openChatByBooking(bookingId);
-      navigate(`/messages/${conversation.conversation_id}`);
-    } catch (err: unknown) {
-      const msg =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data
-          ?.detail || 'פתיחת שיחה נכשלה';
-      setError(typeof msg === 'string' ? msg : String(msg));
-    } finally {
-      setChatLoading(null);
-    }
-  };
-
-  // חישוב התראות חדשות (24 שעות) והתראות להצגה
-  const now = new Date();
-  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  const newNotifications = list.filter(n => new Date(n.created_at) >= yesterday);
-  const displayedNotifications = showAll ? list : list.slice(0, 10);
-
-  const isNewNotification = (notification: NotificationItem) => {
-    return new Date(notification.created_at) >= yesterday;
+  const handleRowClick = (n: NotificationItem) => {
+    const key = getNotificationItemKey(n);
+    if (!isNotificationRead(key)) markNotificationRead(key);
+    // TODO: navigation by action_url when backend supports it
   };
 
   if (loading) {
@@ -113,122 +102,70 @@ export default function Notifications() {
 
   return (
     <div className={styles.page}>
-      <h1 className={styles.pageTitle}>התראות</h1>
-      {newNotifications.length > 0 && (
-        <p className={styles.pageMeta} style={{ color: '#2563eb', marginBottom: '1rem', fontWeight: 500 }}>
-          יש לך {newNotifications.length} התראות חדשות
-        </p>
-      )}
-      <p className={styles.pageMeta} style={{ color: '#6b7280', marginBottom: '1rem' }}>
-        כל ההתראות שלך: בקשות להצטרפות (כנהג), אישור/דחייה (כנוסע).
-      </p>
-      {error && <p className={styles.pageError}>{error}</p>}
-      <div className={styles.cardList}>
-        {list.length === 0 ? (
-          <p className={styles.emptyText}>אין התראות.</p>
-        ) : (
-          <>
-            {displayedNotifications.map((n) => {
-              const isNew = isNewNotification(n);
-              return (
-                <div 
-                  key={`${n.booking_id}-${n.created_at}`} 
-                  className={styles.card}
-                  style={{
-                    borderLeft: isNew ? '4px solid #2563eb' : undefined,
-                    backgroundColor: isNew ? '#f0f9ff' : undefined,
-                  }}
-                >
-                  {isNew && (
-                    <div style={{ 
-                      fontSize: '0.75rem', 
-                      color: '#2563eb', 
-                      fontWeight: 600, 
-                      marginBottom: '0.5rem' 
-                    }}>
-                      חדש
-                    </div>
-                  )}
-                  <div className={styles.cardRoute} style={{ fontWeight: 600 }}>
-                    {n.title}
-                  </div>
-                  {n.body && (
-                    <div className={styles.cardMeta} style={{ marginTop: '0.25rem' }}>
-                      {n.body}
-                    </div>
-                  )}
-                  {(n.ride_origin || n.ride_destination) && (
-                    <div className={`${styles.cardMeta} ${styles.cardRouteSummary}`}>
-                      {n.ride_origin ?? '?'} → {n.ride_destination ?? '?'}
-                    </div>
-                  )}
-                  <div className={styles.cardMeta} style={{ marginTop: '0.25rem', fontSize: '0.9em', color: '#6b7280' }}>
-                    {formatDateTimeNoSeconds(n.created_at)}
-                  </div>
-                  {n.type === 'ride_request' && (
-                    <div className={styles.cardActions} style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <button
-                        type="button"
-                        className={`${styles.btn} ${styles.btnSuccess}`}
-                        onClick={() => handleApprove(n.booking_id)}
-                        disabled={actionBookingId === n.booking_id}
-                      >
-                        {actionBookingId === n.booking_id ? '...' : 'אישור'}
-                      </button>
-                      <button
-                        type="button"
-                        className={`${styles.btn} ${styles.btnOutline}`}
-                        onClick={() => handleReject(n.booking_id)}
-                        disabled={actionBookingId === n.booking_id}
-                      >
-                        דחייה
-                      </button>
-                      <button
-                        type="button"
-                        className={`${styles.btn} ${styles.btnOutline}`}
-                        onClick={() => handleOpenChat(n.booking_id)}
-                        disabled={chatLoading === n.booking_id}
-                      >
-                        {chatLoading === n.booking_id ? '...' : 'שיחה'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            {list.length > 10 && !showAll && (
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnOutline}`}
-                onClick={() => setShowAll(true)}
-                style={{ 
-                  marginTop: '1rem', 
-                  width: '100%',
-                  padding: '0.75rem',
-                  fontSize: '1rem'
-                }}
-              >
-                הצג עוד ({list.length - 10} התראות נוספות)
-              </button>
-            )}
-            {showAll && list.length > 10 && (
-              <button
-                type="button"
-                className={`${styles.btn} ${styles.btnOutline}`}
-                onClick={() => setShowAll(false)}
-                style={{ 
-                  marginTop: '1rem', 
-                  width: '100%',
-                  padding: '0.75rem',
-                  fontSize: '1rem'
-                }}
-              >
-                הצג פחות
-              </button>
-            )}
-          </>
+      <header className={styles.header}>
+        <h1 className={styles.pageTitle}>התראות</h1>
+        {unreadNotifications > 0 && (
+          <button
+            type="button"
+            className={styles.markAllRead}
+            onClick={() => markAllNotificationsRead()}
+          >
+            סמן הכל כנקרא
+          </button>
         )}
-      </div>
+      </header>
+
+      {error && <p className={styles.pageError}>{error}</p>}
+
+      {list.length === 0 ? (
+        <div className={styles.empty}>
+          <Bell size={48} strokeWidth={1.5} className={styles.emptyIcon} />
+          <p className={styles.emptyTitle}>אין התראות חדשות</p>
+          <p className={styles.emptySub}>כשיהיו פעילויות חדשות, הן יופיעו כאן</p>
+        </div>
+      ) : (
+        <div className={styles.groups}>
+          {grouped().map(({ label, items }) => (
+            <div key={label} className={styles.group}>
+              <h2 className={styles.groupTitle}>{label}</h2>
+              {items.map((n) => {
+                const key = getNotificationItemKey(n);
+                const read = isNotificationRead(key);
+                const displayType = getDisplayType(n.type);
+                const routeStr = [n.ride_origin, n.ride_destination].filter(Boolean).join(' → ') || null;
+                const bodyLine = n.body && routeStr ? `${n.body} · ${routeStr}` : (n.body || routeStr);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    className={`${styles.notificationRow} ${read ? '' : styles.unread}`}
+                    onClick={() => handleRowClick(n)}
+                  >
+                    <span className={`${styles.notifIcon} ${styles[`icon_${displayType}`]}`}>
+                      {displayType === 'booking_approved' && <CheckCircle size={16} />}
+                      {displayType === 'booking_rejected' && <XCircle size={16} />}
+                      {displayType === 'ride_cancelled' && <AlertTriangle size={16} />}
+                      {displayType === 'booking_request' && <UserPlus size={16} />}
+                      {displayType === 'booking_cancelled_by_passenger' && <UserMinus size={16} />}
+                      {displayType === 'group_joined' && <Users size={16} />}
+                      {displayType === 'group_member_joined' && <UserCheck size={16} />}
+                      {(displayType === 'pending_approval' || displayType === 'default') && <Bell size={16} />}
+                    </span>
+                    <div className={styles.notifContent}>
+                      <p className={read ? styles.notifTitle : `${styles.notifTitle} ${styles.notifTitleUnread}`}>
+                        {n.title}
+                      </p>
+                      {bodyLine && <p className={styles.notifBody}>{bodyLine}</p>}
+                      <p className={styles.notifTime}>{formatDateTimeNoSeconds(n.created_at)}</p>
+                    </div>
+                    {!read && <span className={styles.unreadDot} aria-hidden />}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

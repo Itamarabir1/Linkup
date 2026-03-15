@@ -1,53 +1,215 @@
-.page {
-  padding: 1rem 1.5rem;
-  max-width: 800px;
-  margin: 0 auto;
-  text-align: right;
+.container {
+  display: flex;
+  height: calc(100vh - 56px);
+  background: var(--bg-page);
 }
 
-.pageTitle {
-  font-size: 1.5rem;
-  margin-bottom: 1rem;
-}
-
-.pageMeta {
-  color: #6b7280;
-  margin-bottom: 1rem;
-}
-
-.pageError {
-  color: #dc2626;
-  margin-bottom: 1rem;
-}
-
-.pageLoading,
-.emptyText {
-  text-align: center;
-  color: #6b7280;
-  padding: 2rem;
-}
-
-.cardList {
+.sidebar {
+  width: 360px;
+  flex-shrink: 0;
+  background: var(--bg-card);
+  border-left: 1px solid var(--border);
+  height: 100%;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
 }
 
-.card {
-  background: #fff;
-  padding: 1rem 1.25rem;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  border-right: 4px solid #2563eb;
+.sidebarHeader {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
 }
 
-.cardRoute {
+.title {
+  font-family: "Rubik", "Heebo", sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.newCount {
+  font-family: "Heebo", sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-secondary);
+}
+
+.loading,
+.error {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.error {
+  color: var(--danger-text);
+}
+
+.emptyList {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 20px;
+}
+
+.emptyIcon {
+  color: #d1d5db;
+}
+
+.emptyTitle {
+  font-family: "Heebo", sans-serif;
+  font-size: 16px;
   font-weight: 600;
-  font-size: 1rem;
+  color: var(--text-primary);
+  margin: 0;
 }
 
-.cardMeta {
-  font-size: 0.9rem;
-  color: #6b7280;
-  margin-top: 0.25rem;
+.emptySub {
+  font-family: "Heebo", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.conversationList {
+  display: flex;
+  flex-direction: column;
+}
+
+.conversationRow {
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  border-bottom: 1px solid var(--border);
+  transition: background 150ms;
+  width: 100%;
+  text-align: right;
+  font-family: inherit;
+}
+
+.conversationRow:hover {
+  background: var(--bg-secondary);
+}
+
+.conversationRow.active {
+  background: var(--primary-light);
+  border-right: 3px solid var(--primary);
+}
+
+.avatarWrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.avatarLetter {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  font-family: "Heebo", sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rowContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.rowFirst {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.partnerName {
+  font-family: "Heebo", sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversationRow.active .partnerName {
+  font-weight: 600;
+}
+
+.rowTime {
+  font-family: "Heebo", sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.lastPreview {
+  margin: 2px 0 0;
+  font-family: "Heebo", sans-serif;
+  font-size: 13px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+
+.conversationRow.active .lastPreview {
+  color: var(--text-primary);
+}
+
+.panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--bg-page);
+}
+
+.panelPlaceholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--bg-page);
+}
+
+.placeholderIcon {
+  color: #d1d5db;
+}
+
+.placeholderText {
+  font-family: "Heebo", sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  margin: 0;
 }

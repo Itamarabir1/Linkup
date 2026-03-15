@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { GroupProvider } from './context/GroupContext';
+import { ChatProvider } from './context/ChatContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -69,7 +70,10 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <GroupProvider>
-          <AppRoutes />
+          {/* ChatProvider must be inside Router so useLocation() works */}
+          <ChatProvider>
+            <AppRoutes />
+          </ChatProvider>
         </GroupProvider>
       </AuthProvider>
     </BrowserRouter>

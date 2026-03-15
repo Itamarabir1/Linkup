@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { MessageCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useChat } from '../context/ChatContext';
 import { listConversations } from '../api/client';
 import type { ConversationListItem } from '../api/client';
-import { formatDateTimeNoSeconds } from '../utils/date';
+import { formatConversationTime } from '../utils/date';
+import MessageThread from './MessageThread';
 import styles from './Messages.module.css';
 
 export default function Messages() {
   const { user } = useAuth();
+  const { openChat, panelConversationId } = useChat();
   const [list, setList] = useState<ConversationListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -35,86 +38,86 @@ export default function Messages() {
     fetchList();
   }, [fetchList]);
 
-  if (loading) {
-    return (
-      <div className={styles.page}>
-        <h1 className={styles.pageTitle}>הודעות</h1>
-        <p className={styles.pageLoading}>טוען...</p>
-      </div>
-    );
-  }
+  const unreadCount = 0; // TODO: from API when available
 
   return (
-    <div className={styles.page}>
-      <h1 className={styles.pageTitle}>הודעות</h1>
-      <p className={styles.pageMeta} style={{ color: '#6b7280', marginBottom: '1rem' }}>
-        שיחות עם נהגים ונוסעים (רק עם מי שיש ביניכם קשר נסיעה).
-      </p>
-      {error && <p className={styles.pageError}>{error}</p>}
-      <div className={styles.cardList}>
-        {list.length === 0 ? (
-          <p className={styles.emptyText}>אין שיחות. פתח שיחה מההתראות, מההזמנות או מנסיעות כנהג.</p>
+    <div className={styles.container}>
+      <aside className={styles.sidebar}>
+        <header className={styles.sidebarHeader}>
+          <h1 className={styles.title}>הודעות</h1>
+          {unreadCount > 0 && (
+            <span className={styles.newCount}>({unreadCount} חדשות)</span>
+          )}
+        </header>
+
+        {loading ? (
+          <div className={styles.loading}>טוען...</div>
+        ) : error ? (
+          <div className={styles.error}>{error}</div>
+        ) : list.length === 0 ? (
+          <div className={styles.emptyList}>
+            <MessageCircle size={48} strokeWidth={1.5} className={styles.emptyIcon} />
+            <p className={styles.emptyTitle}>אין הודעות עדיין</p>
+            <p className={styles.emptySub}>הודעות נשלחות דרך נסיעות</p>
+          </div>
         ) : (
-          list.map((c) => (
-            <Link
-              key={c.conversation_id}
-              to={`/messages/${c.conversation_id}`}
-              className={styles.card}
-              style={{
-                display: 'block',
-                textDecoration: 'none',
-                color: 'inherit',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                {c.partner.avatar_url ? (
-                  <img
-                    src={c.partner.avatar_url}
-                    alt=""
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: '50%',
-                      objectFit: 'cover',
-                    }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: '50%',
-                      background: 'var(--surface, #e5e7eb)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '1rem',
-                      fontWeight: 600,
-                    }}
-                  >
-                    {(c.partner.full_name || '?').charAt(0).toUpperCase()}
+          <div className={styles.conversationList}>
+            {list.map((c) => (
+              <button
+                key={c.conversation_id}
+                type="button"
+                className={`${styles.conversationRow} ${panelConversationId === c.conversation_id ? styles.active : ''}`}
+                onClick={() => openChat(c.conversation_id)}
+              >
+                <div className={styles.avatarWrap}>
+                  {c.partner.avatar_url ? (
+                    <img
+                      src={c.partner.avatar_url}
+                      alt=""
+                      className={styles.avatar}
+                    />
+                  ) : (
+                    <span className={styles.avatarLetter}>
+                      {(c.partner.full_name || '?').charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                  {/* TODO: unread dot when API supports it */}
+                </div>
+                <div className={styles.rowContent}>
+                  <div className={styles.rowFirst}>
+                    <span className={styles.partnerName}>
+                      {c.partner.full_name || `משתמש #${c.partner.user_id}`}
+                    </span>
+                    <span className={styles.rowTime}>
+                      {formatConversationTime(c.last_message_at)}
+                    </span>
                   </div>
-                )}
-                <div>
-                  <div className={styles.cardRoute} style={{ fontWeight: 600 }}>
-                    {c.partner.full_name || `משתמש #${c.partner.user_id}`}
-                  </div>
-              {c.last_message_preview && (
-                <div className={styles.cardMeta} style={{ marginTop: '0.25rem', color: '#6b7280' }}>
-                  {c.last_message_preview}
+                  {c.last_message_preview && (
+                    <p className={styles.lastPreview}>
+                      {c.last_message_preview}
+                    </p>
+                  )}
+                  {/* Optional route row when we have origin/destination in API */}
                 </div>
-              )}
-              {c.last_message_at && (
-                <div className={styles.cardMeta} style={{ marginTop: '0.25rem', fontSize: '0.85em' }}>
-                  {formatDateTimeNoSeconds(c.last_message_at)}
-                </div>
-              )}
-                </div>
-              </div>
-            </Link>
-          ))
+              </button>
+            ))}
+          </div>
         )}
-      </div>
+      </aside>
+
+      <section className={styles.panel}>
+        {panelConversationId ? (
+          <MessageThread
+            conversationId={panelConversationId}
+            embedded
+          />
+        ) : (
+          <div className={styles.panelPlaceholder}>
+            <MessageCircle size={56} strokeWidth={1.5} className={styles.placeholderIcon} />
+            <p className={styles.placeholderText}>בחר שיחה כדי להתחיל</p>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

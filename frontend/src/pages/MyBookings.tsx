@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { MessageCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useGroup } from '../context/GroupContext';
+import { useChat } from '../context/ChatContext';
 import { api, openChatByBooking } from '../api/client';
 import type { Ride } from '../types/api';
 import { formatRideDate } from '../utils/date';
@@ -63,7 +63,7 @@ function avatarInitial(name: string): string {
 export default function MyBookings() {
   const { user } = useAuth();
   const { myGroups } = useGroup();
-  const navigate = useNavigate();
+  const { openChat } = useChat();
   const [activeTab, setActiveTab] = useState<TabKind>('passenger');
   const [passengerList, setPassengerList] = useState<PassengerBookingItem[]>([]);
   const [driverList, setDriverList] = useState<DriverBookingItem[]>([]);
@@ -187,7 +187,7 @@ export default function MyBookings() {
     setError('');
     try {
       const conversation = await openChatByBooking(bookingId);
-      navigate(`/messages/${conversation.conversation_id}`);
+      openChat(conversation.conversation_id);
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'פתיחת שיחה נכשלה';
